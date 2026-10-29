@@ -7,6 +7,7 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { STATUS_COLOR, fetchStatus, containerStatus, unitStatus } from "./status.js";
 
 const REFRESH_MS = 5000;
@@ -283,7 +284,9 @@ renderer.setAnimationLoop(() => {
 infra = await (await fetch("data/infra.json")).json();
 document.getElementById("title").textContent = infra.host.title;
 document.getElementById("subtitle").textContent = infra.host.subtitle;
-const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+// Blender 내보내기는 Draco로 압축한다(blender/export.py).
+const draco = new DRACOLoader().setDecoderPath("https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/libs/draco/gltf/");
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).setDRACOLoader(draco);
 setupRack(await loader.loadAsync("data/rack.glb"));
 await refresh();
 setInterval(refresh, REFRESH_MS);

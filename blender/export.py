@@ -74,7 +74,8 @@ def optimize():
             parts = _descendants(u)
             for led in [p for p in parts if _keep(p)]:
                 _parent(led, u)
-            _join([p for p in parts if not _keep(p)], f"{u.name}_body", u)
+            # 몸체 이름에 unit__ 접두사를 쓰지 않는다(웹은 unit__<id>를 장비로 인식한다)
+            _join([p for p in parts if not _keep(p)], f"{u.name[len('unit__'):]}_body", u)
         in_units = set(units)
         for u in units:
             in_units.update(_descendants(u))

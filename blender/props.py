@@ -34,8 +34,9 @@ class Mats:
         self.books = [mat(f"book_{i}", c, rough=0.7) for i, c in enumerate([
             (0.42, 0.52, 0.40), (0.82, 0.76, 0.62), (0.62, 0.30, 0.18), (0.12, 0.20, 0.35),
             (0.78, 0.58, 0.22), (0.25, 0.25, 0.27), (0.70, 0.66, 0.58), (0.35, 0.22, 0.15)])]
-        self.cat = mat("cat_orange", (0.80, 0.42, 0.16), rough=0.9)
-        self.cat_white = mat("cat_white", (0.92, 0.89, 0.83), rough=0.9)
+        self.vacuum = mat("vacuum_white", (0.88, 0.88, 0.86), rough=0.35, coat=0.3)
+        self.vacuum_led = mat("vacuum_led", (0.30, 1.0, 0.55), rough=0.3, emit=(0.30, 1.0, 0.55), strength=4.0)
+        self.blind = mat("blind", (0.93, 0.91, 0.86), rough=0.6)
         self.shade = mat("lamp_shade", (0.92, 0.86, 0.74), rough=0.9, emit=(1.0, 0.78, 0.50), strength=1.6 * glow)
         self.bulb = mat("bulb", (1.0, 0.95, 0.85), rough=0.3, emit=(1.0, 0.80, 0.55), strength=0.5 + 25.0 * glow)
         self.sign_glow = mat("sign_glow", (0.95, 0.88, 0.72), rough=0.5, emit=(1.0, 0.72, 0.40), strength=6.0 * glow)
@@ -163,12 +164,14 @@ def chair(m, name, loc, rotz, col):
         b.rotation_euler = (0, 0, a)
         sphere(f"{name}_caster_{i}", 0.028, (x, y, 0.03), m.charcoal, parent=root, col=col)
     cyl(f"{name}_gas", 0.025, 0.30, (0, 0, 0.22), m.black_metal, segments=20, parent=root, col=col)
-    box(f"{name}_seat", (0.50, 0.48, 0.09), (0, 0, 0.44), m.fabric_dark, bevel=0.035, parent=root, col=col)
-    back = box(f"{name}_back", (0.47, 0.07, 0.56), (0, 0.24, 0.80), m.fabric_dark, bevel=0.035, parent=root, col=col)
+    # 좌판 위쪽은 웹에서 빙글 돌리는 부분이다(축은 의자 중심)
+    top = empty(f"part__{name}_top", (0, 0, 0), parent=root, col=col)
+    box(f"{name}_seat", (0.50, 0.48, 0.09), (0, 0, 0.44), m.fabric_dark, bevel=0.035, parent=top, col=col)
+    back = box(f"{name}_back", (0.47, 0.07, 0.56), (0, 0.24, 0.80), m.fabric_dark, bevel=0.035, parent=top, col=col)
     back.rotation_euler = (R(-8), 0, 0)
     for sx in (-1, 1):
-        box(f"{name}_arm_post_{sx}", (0.03, 0.04, 0.18), (sx * 0.26, 0.04, 0.55), m.black_metal, bevel=0.008, parent=root, col=col)
-        box(f"{name}_arm_pad_{sx}", (0.06, 0.26, 0.03), (sx * 0.26, 0.02, 0.65), m.charcoal, bevel=0.012, parent=root, col=col)
+        box(f"{name}_arm_post_{sx}", (0.03, 0.04, 0.18), (sx * 0.26, 0.04, 0.55), m.black_metal, bevel=0.008, parent=top, col=col)
+        box(f"{name}_arm_pad_{sx}", (0.06, 0.26, 0.03), (sx * 0.26, 0.02, 0.65), m.charcoal, bevel=0.012, parent=top, col=col)
     return root
 
 
@@ -226,8 +229,8 @@ def armchair(m, name, loc, rotz, col):
         box(f"{name}_arm_{sx}", (0.14, 0.78, 0.36), (sx * 0.37, 0.0, 0.40), m.fabric_sage, bevel=0.06, parent=root, col=col)
         for sy in (-1, 1):
             cone(f"{name}_leg_{sx}_{sy}", 0.016, 0.022, 0.10, (sx * 0.34, sy * 0.30, 0), m.wood_dark, segments=12, parent=root, col=col)
-    pillow = box(f"{name}_pillow", (0.36, 0.12, 0.30), (0.08, 0.17, 0.58), m.fabric, bevel=0.06, parent=root, col=col)
-    pillow.rotation_euler = (R(-15), 0, R(8))
+    pillow = empty(f"part__{name}_pillow", (0.08, 0.17, 0.58), parent=root, col=col)
+    box(f"{name}_pillow_body", (0.36, 0.12, 0.30), (0, 0, 0), m.fabric, bevel=0.06, parent=pillow, col=col, rot=(R(-15), 0, R(8)))
     return root
 
 
@@ -238,11 +241,22 @@ def side_table(m, name, loc, col):
         a = R(90 + i * 120)
         leg = cyl(f"{name}_leg_{i}", 0.014, 0.50, (math.cos(a) * 0.12, math.sin(a) * 0.12, 0.25), m.wood_dark, segments=12, parent=root, col=col)
         leg.rotation_euler = (R(8) * math.sin(a), -R(8) * math.cos(a), 0)
-    mug(m, f"{name}_mug", (0.07, -0.05, 0.518), root, col, material=m.pots[2])
-    books_root = empty(f"{name}_books", (-0.06, 0.06, 0.518), parent=root, col=col)
+    mug(m, f"{name}_mug", (0.10, -0.10, 0.518), root, col, material=m.pots[2])
+    books_root = empty(f"{name}_books", (-0.08, 0.05, 0.518), parent=root, col=col)
     box(f"{name}_book_a", (0.20, 0.14, 0.025), (0, 0, 0.0125), m.books[3], bevel=0.003, parent=books_root, col=col)
-    box(f"{name}_book_b", (0.18, 0.13, 0.02), (0.005, 0, 0.035), m.books[1], bevel=0.003, parent=books_root, col=col).rotation_euler = (0, 0, R(12))
+    book(m, f"{name}_book_b", (0, 0, 0.025), (0.17, 0.125, 0.022), m.books[1], books_root, col)
     return root
+
+
+def book(m, name, loc, size, material, root, col):
+    """덮개를 펼칠 수 있는 책. 등은 +X 모서리이고, 덮개는 등을 축으로 도는 부분(part__)이다."""
+    w, d, h = size
+    r = empty(name, loc, parent=root, col=col)
+    box(f"{name}_back", (w, d, 0.003), (0, 0, 0.0015), material, bevel=0.001, parent=r, col=col)
+    box(f"{name}_pages", (w - 0.008, d - 0.008, h - 0.006), (-0.003, 0, h / 2), m.ivory, parent=r, col=col)
+    box(f"{name}_spine", (0.004, d, h), (w / 2 - 0.002, 0, h / 2), material, bevel=0.001, parent=r, col=col)
+    hinge = empty(f"part__{name}_cover", (w / 2, 0, h), parent=r, col=col)
+    box(f"{name}_cover_slab", (w, d, 0.003), (-w / 2, 0, -0.0015), material, bevel=0.001, parent=hinge, col=col)
 
 
 def rug(m, name, loc, col, w=1.7, d=1.15):
@@ -270,19 +284,39 @@ def floor_lamp(m, name, loc, col):
     return root
 
 
-def cat(m, name, loc, rotz, col):
-    """식빵 자세로 잠든 고양이."""
+def vacuum(m, loc, col):
+    """로봇 청소기. 정면(-Y)에 상태 LED가 있고, 웹에서 통째로 움직이므로 중심을 축으로 둔다(part__)."""
+    root = empty("part__vacuum", loc, col=col)
+    cyl("vacuum_body", 0.165, 0.062, (0, 0, 0.041), m.vacuum, segments=48, bevel=0.012, parent=root, col=col)
+    cyl("vacuum_bumper", 0.168, 0.03, (0, 0, 0.026), m.charcoal, segments=48, bevel=0.006, parent=root, col=col)
+    cyl("vacuum_lid", 0.148, 0.004, (0, 0, 0.073), m.charcoal, segments=48, parent=root, col=col)
+    cyl("vacuum_lidar", 0.042, 0.024, (0, 0.05, 0.085), m.vacuum, segments=32, bevel=0.006, parent=root, col=col)
+    cyl("vacuum_lidar_cap", 0.034, 0.004, (0, 0.05, 0.098), m.charcoal, segments=32, parent=root, col=col)
+    cyl("vacuum_button", 0.014, 0.004, (0, -0.07, 0.076), m.ivory, segments=20, parent=root, col=col)
+    cyl("vacuum_led", 0.007, 0.004, (0, -0.105, 0.076), m.vacuum_led, segments=16, parent=root, col=col)
+    return root
+
+
+def dock(m, name, loc, rotz, col):
+    """청소기 충전대. 뒤(+Y)를 벽에 붙인다."""
     root = _root(name, loc, rotz, col)
-    sphere(f"{name}_body", 1.0, (0, 0.02, 0.075), m.cat, scale=(0.13, 0.19, 0.085), segments=32, parent=root, col=col)
-    sphere(f"{name}_chest", 1.0, (0, -0.10, 0.06), m.cat_white, scale=(0.09, 0.06, 0.06), parent=root, col=col)
-    sphere(f"{name}_head", 0.075, (0, -0.17, 0.11), m.cat, scale=(1.1, 0.95, 0.9), segments=32, parent=root, col=col)
-    sphere(f"{name}_muzzle", 0.035, (0, -0.235, 0.095), m.cat_white, scale=(1.2, 0.8, 0.7), parent=root, col=col)
+    box(f"{name}_body", (0.26, 0.08, 0.11), (0, 0.03, 0.055), m.vacuum, bevel=0.02, parent=root, col=col)
+    box(f"{name}_face", (0.18, 0.006, 0.045), (0, -0.011, 0.06), m.charcoal, bevel=0.002, parent=root, col=col)
     for sx in (-1, 1):
-        ear = cone(f"{name}_ear_{sx}", 0.028, 0.002, 0.05, (sx * 0.045, -0.165, 0.165), m.cat, segments=12, parent=root, col=col)
-        ear.rotation_euler = (R(-10), R(sx * 22), 0)
-        box(f"{name}_eye_{sx}", (0.022, 0.004, 0.003), (sx * 0.032, -0.236, 0.122), m.charcoal, parent=root, col=col).rotation_euler = (0, R(sx * -10), 0)
-        sphere(f"{name}_paw_{sx}", 0.028, (sx * 0.05, -0.20, 0.02), m.cat_white, scale=(1, 1.4, 0.7), parent=root, col=col)
-    cable(f"{name}_tail", [(0.08, 0.17, 0.04), (0.15, 0.05, 0.03), (0.13, -0.10, 0.025), (0.06, -0.17, 0.025)], 0.024, m.cat, parent=root, col=col)
+        box(f"{name}_pin_{sx}", (0.03, 0.02, 0.006), (sx * 0.05, -0.02, 0.003), m.brass, parent=root, col=col)
+    return root
+
+
+def blinds(m, name, x0, x1, z_top, y, col, count=27, stack=0.0055):
+    """창 위에 걷어 올린 블라인드. 살과 아래 막대는 웹에서 내리고 기울이는 부분(part__)이다."""
+    root = _root(name, (0, 0, 0), 0, col)
+    w, cx = x1 - x0, (x0 + x1) / 2
+    box(f"{name}_rail", (w + 0.03, 0.045, 0.035), (cx, y, z_top + 0.0175), m.blind, bevel=0.006, parent=root, col=col)
+    cable(f"{name}_cord", [(x1 - 0.04, y - 0.02, z_top), (x1 - 0.04, y - 0.025, z_top - 0.35), (x1 - 0.04, y - 0.025, z_top - 0.62)],
+          0.002, m.blind, parent=root, col=col)
+    for i in range(count):
+        box(f"part__blind_{i:02d}", (w, 0.045, 0.003), (cx, y, z_top - 0.006 - i * stack), m.blind, col=col)
+    box("part__blind_bottom", (w + 0.01, 0.05, 0.012), (cx, y, z_top - 0.012 - count * stack), m.blind, bevel=0.004, col=col)
     return root
 
 

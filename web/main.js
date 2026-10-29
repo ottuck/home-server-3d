@@ -156,7 +156,7 @@ let history = null;
 let rack = null;
 let infra = null;
 let status = null;
-globalThis.viewer = { leds, units, mats, scene, camera, get status() { return status; }, get cat() { return cat; }, get switches() { return switches; } }; // 콘솔 디버깅용
+globalThis.viewer = { leds, units, mats, scene, camera, get status() { return status; }, get vacuum() { return vacuum; }, get switches() { return switches; }, get toys() { return toys; } }; // 콘솔 디버깅용
 
 function setupScene(gltf, nightSky) {
   const root = gltf.scene;
@@ -201,7 +201,8 @@ function setupScene(gltf, nightSky) {
   root.updateMatrixWorld(true); // 첫 렌더 전에 장비 위치(이름표 기준점)를 계산하려면 필요하다
   makeTags();
   setupSwitches(root);
-  setupCat(root.getObjectByName("prop__cat"));
+  setupVacuum(root.getObjectByName("part__vacuum"));
+  setupToys(root);
 }
 
 // 벽 모니터의 장식 그림을 실제 그래프 캔버스로 바꾼다(glTF UV에 맞춰 flipY 끔).
@@ -238,7 +239,6 @@ function applyTheme(name) {
   sun.intensity = t.sun;
   sun.castShadow = t.sun > 0;
   scene.environmentIntensity = t.env;
-  windowLight.intensity = t.window;
   windowLight.color.set(name === "day" ? 0xfff0d8 : 0x8ea4ff);
   for (const s of switches) s.on = t.lamps; // 테마를 바꾸면 눌러서 바꾼 조명도 그 테마 기본으로 돌아간다
   rackLight.intensity = t.rack;
@@ -463,6 +463,14 @@ const GLOW = {
 };
 const switches = []; // { label, light, glow: 재질[], hit: 투명 상자, on, level }
 
+// 고르기에만 쓰는 투명 상자(그리지 않는다)
+function hitBox(box, pad) {
+  const size = box.getSize(new THREE.Vector3()).addScalar(pad);
+  const m = new THREE.Mesh(new THREE.BoxGeometry(size.x, size.y, size.z), new THREE.MeshBasicMaterial({ visible: false }));
+  box.getCenter(m.position);
+  return m;
+}
+
 function setupSwitches(root) {
   for (const s of SWITCHES) {
     const node = root.getObjectByName(s.node);
@@ -478,9 +486,7 @@ function setupSwitches(root) {
     });
     if (!s.only) zone.setFromObject(node);
     // 가는 기둥이나 작은 전구도 누르기 쉽게 조금 넉넉한 투명 상자로 고른다
-    const size = zone.getSize(new THREE.Vector3()).addScalar(s.only ? 0.2 : 0.06);
-    const hit = new THREE.Mesh(new THREE.BoxGeometry(size.x, size.y, size.z), new THREE.MeshBasicMaterial({ visible: false }));
-    zone.getCenter(hit.position);
+    const hit = hitBox(zone, s.only ? 0.2 : 0.06);
     scene.add(hit);
     switches.push({ label: s.label, light: s.light, glow, hit, on: false, level: 0 });
   }
@@ -498,87 +504,171 @@ function stepSwitches(dt) {
   }
 }
 
-// 고양이: 숨 쉬듯 조금씩 부풀고, 누르거나 가끔 저절로 일어나 다른 자리로 걸어간다.
-// 자리는 가구와 겹치지 않고, 서로 곧게 오갈 수 있고, 기본 구도에서 가려지지 않는 바닥(Blender x, y)이다.
-const CAT_SPOTS = [[-0.30, -0.22], [0.10, 0.40], [-0.10, -0.75], [-0.75, -0.95], [0.20, -0.20]].map(([x, y]) => B(x, y, 0));
-const CAT_SPEED = 0.45; // m/s
-const HOP = 0.45; // 제자리에서 펄쩍 뛰며 돌아서는 시간(초)
-let cat = null; // { node, hit, scale, y, heading, move, bubble, nextWander }
+// 로봇 청소기: 누르거나 가끔 저절로 충전대를 떠나 바닥 세 곳을 돌며 제자리에서 한 바퀴씩 돌고, 충전대로 후진해 들어간다.
+// 청소 중에 누르면 바로 돌아간다. 자리는 가구 다리를 피해 곧게 오갈 수 있고 기본 구도에서 보이는 바닥(Blender x, y)이다.
+const VAC_SPOTS = [[-0.25, -0.25], [0.10, 0.40], [-0.10, -0.75], [0.20, -0.20]].map(([x, y]) => B(x, y, 0));
+const VAC_SPEED = 0.28; // m/s
+const VAC_TURN = Math.PI; // rad/s
+const RUG = { x0: -0.70, x1: 1.00, z0: -0.155, z1: 0.995 }; // 러그(three 좌표). 1.4cm 두께라 올라탈 때 살짝 높인다.
+const rugLift = (p) => 0.014 * THREE.MathUtils.clamp((Math.min(p.x - RUG.x0, RUG.x1 - p.x, p.z - RUG.z0, RUG.z1 - p.z) + 0.08) / 0.16, 0, 1);
+let vacuum = null; // { node, led, y, dock, front, heading, plan, step, next, say, bubble }
 
-function setupCat(node) {
+function setupVacuum(node) {
   if (!node) return;
-  // 합친 메시라 노드에 몸통 크기만큼의 scale이 들어 있다. 투명 상자도 노드 안에 넉넉하게 둔다.
-  const box = new THREE.Box3();
-  node.traverse((o) => {
-    if (!o.isMesh) return;
-    o.geometry.computeBoundingBox();
-    box.union(o.geometry.boundingBox);
-  });
-  const size = box.getSize(new THREE.Vector3()).multiplyScalar(1.4);
-  const hit = new THREE.Mesh(new THREE.BoxGeometry(size.x, size.y, size.z), new THREE.MeshBasicMaterial({ visible: false }));
-  box.getCenter(hit.position);
+  let led = null;
+  node.traverse((o) => o.isMesh && o.material.name === "vacuum_led" && (led = o.material));
+  // 노드는 바닥 중심이 원점이고 회전이 없다(blender/export.py part__). 투명 상자를 자식으로 붙여 함께 움직인다.
+  const hit = hitBox(new THREE.Box3().setFromObject(node).translate(node.position.clone().negate()), 0.06);
   node.add(hit);
   const bubble = document.createElement("div");
   bubble.className = "bubble";
-  bubble.textContent = "야옹";
   $("tags").append(bubble);
-  cat = { node, hit, scale: node.scale.clone(), y: node.position.y, heading: node.rotation.y, move: null, bubble, nextWander: 40 };
+  const dock = node.position.clone();
+  vacuum = { node, led, y: dock.y, dock, front: dock.clone().add(new THREE.Vector3(0, 0, 0.3)), heading: 0, plan: [], step: null, next: 45, say: null, bubble };
 }
 
-const isCat = (obj) => { for (let o = obj; o; o = o.parent) if (o === cat?.node) return true; return false; };
+const isVacuum = (obj) => { for (let o = obj; o; o = o.parent) if (o === vacuum?.node) return true; return false; };
+const vacuumBusy = () => !!vacuum && (!!vacuum.step || vacuum.plan.length > 0);
+const homePlan = () => [{ kind: "face", to: vacuum.front }, { kind: "drive", to: vacuum.front }, { kind: "turn", to: 0 }, { kind: "drive", to: vacuum.dock, back: true }];
 
-function wakeCat(t, meow) {
-  if (!cat || cat.move) return;
-  const here = cat.node.position;
-  const far = CAT_SPOTS.filter((p) => Math.hypot(p.x - here.x, p.z - here.z) > 0.3);
-  const to = far[Math.floor(Math.random() * far.length)];
-  const d = Math.hypot(to.x - here.x, to.z - here.z);
-  let turn = Math.atan2(to.x - here.x, to.z - here.z) - cat.heading; // 머리는 노드의 +Z 쪽
-  turn = Math.atan2(Math.sin(turn), Math.cos(turn));
-  cat.move = { t0: t, from: here.clone(), to: to.clone().setY(cat.y), d, h0: cat.heading, turn, meow };
-}
-
-function stepCat(t) {
-  if (!cat) return;
-  const { node, scale } = cat;
-  const m = cat.move;
-  if (!m) {
-    cat.bubble.classList.remove("show");
-    const b = Math.sin(t * 2.2); // 숨쉬기
-    node.scale.set(scale.x * (1 + 0.012 * b), scale.y * (1 + 0.02 * b), scale.z * (1 + 0.012 * b));
-    if (t > cat.nextWander) wakeCat(t, false);
+function runVacuum(t, byClick) {
+  if (!vacuum) return;
+  if (vacuumBusy()) {
+    vacuum.plan = homePlan();
+    vacuum.step = null;
+    vacuum.say = { text: "충전하러 갈게요", until: t + 1.6 };
     return;
   }
-  const e = t - m.t0;
-  const walk = m.d / CAT_SPEED;
-  if (e < HOP) {
-    const k = e / HOP;
-    node.position.y = cat.y + 0.07 * Math.sin(Math.PI * k);
-    cat.heading = m.h0 + m.turn * (1 - (1 - k) ** 2);
-    const s = 1 + 0.12 * Math.sin(Math.PI * k); // 뛰는 동안 몸을 길게 편다
-    node.scale.set(scale.x / Math.sqrt(s), scale.y, scale.z * s);
-  } else if (e < HOP + walk) {
-    const k = (e - HOP) / walk;
-    const q = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
-    node.position.lerpVectors(m.from, m.to, q);
-    node.position.y = cat.y + 0.012 * Math.abs(Math.sin((Math.PI * q * m.d) / 0.11)); // 총총걸음
-    cat.heading = m.h0 + m.turn;
-    node.scale.copy(scale);
+  const spots = [...VAC_SPOTS].sort(() => Math.random() - 0.5).slice(0, 3);
+  vacuum.plan = [{ kind: "drive", to: vacuum.front }, ...spots.flatMap((p) => [{ kind: "face", to: p }, { kind: "drive", to: p }, { kind: "spin" }]), ...homePlan()];
+  if (byClick) vacuum.say = { text: "청소 시작!", until: t + 1.6 };
+}
+
+function startStep(s, t) {
+  const pos = vacuum.node.position;
+  s.t0 = t;
+  if (s.kind === "drive") {
+    s.from = pos.clone().setY(vacuum.y);
+    s.dur = s.from.distanceTo(s.to) / (s.back ? VAC_SPEED / 2 : VAC_SPEED);
   } else {
-    node.position.copy(m.to);
-    node.scale.copy(scale);
-    cat.move = null;
-    cat.nextWander = t + 35 + Math.random() * 40;
+    s.h0 = vacuum.heading;
+    const to = s.kind === "face" ? Math.atan2(s.to.x - pos.x, s.to.z - pos.z) : s.to; // 앞(LED 쪽)은 노드의 +Z
+    s.delta = s.kind === "spin" ? 2 * Math.PI : Math.atan2(Math.sin(to - s.h0), Math.cos(to - s.h0));
+    s.dur = Math.abs(s.delta) / VAC_TURN;
   }
-  node.rotation.set(0, cat.heading, 0);
-  const show = m.meow && e < 1.6;
-  cat.bubble.classList.toggle("show", show);
-  if (show) {
-    v.copy(node.position).setY(cat.y + 0.2).project(camera);
-    cat.bubble.style.left = `${((v.x + 1) / 2) * stage.clientWidth}px`;
-    cat.bubble.style.top = `${((1 - v.y) / 2) * stage.clientHeight}px`;
+  vacuum.step = s;
+}
+
+function stepVacuum(t) {
+  if (!vacuum) return;
+  const { node, led } = vacuum;
+  if (!vacuum.step && vacuum.plan.length) startStep(vacuum.plan.shift(), t);
+  const s = vacuum.step;
+  if (s) {
+    const k = s.dur > 0 ? Math.min((t - s.t0) / s.dur, 1) : 1;
+    const e = k * k * (3 - 2 * k);
+    if (s.kind === "drive") node.position.lerpVectors(s.from, s.to, e);
+    else vacuum.heading = s.h0 + s.delta * e;
+    if (k === 1) {
+      vacuum.step = null;
+      if (!vacuum.plan.length) vacuum.next = t + 90 + Math.random() * 60;
+    }
+  } else if (t > vacuum.next) {
+    runVacuum(t, false);
+  }
+  node.position.y = vacuum.y + rugLift(node.position);
+  node.rotation.set(0, vacuum.heading, 0);
+  // LED: 청소 중엔 파랑, 충전대에서는 초록으로 천천히 숨 쉰다
+  if (led) {
+    const busy = vacuumBusy();
+    led.emissive.setRGB(...(busy ? [0.25, 0.6, 1.0] : [0.3, 1.0, 0.55]));
+    led.emissiveIntensity = busy ? 4 : 1 + 2 * (0.5 + 0.5 * Math.sin(t * 2));
+  }
+  const say = vacuum.say && t < vacuum.say.until;
+  vacuum.bubble.classList.toggle("show", !!say);
+  if (say) {
+    vacuum.bubble.textContent = vacuum.say.text;
+    v.copy(node.position).setY(node.position.y + 0.22).project(camera);
+    vacuum.bubble.style.left = `${((v.x + 1) / 2) * stage.clientWidth}px`;
+    vacuum.bubble.style.top = `${((1 - v.y) / 2) * stage.clientHeight}px`;
   }
 }
+
+// 눌러서 움직이는 소품: 책 덮개, 안락의자 쿠션, 의자 윗부분, 블라인드.
+// value가 target을 따라가며(빠르게 시작해 천천히 멈춘다) apply가 그 값으로 모양을 바꾼다.
+const toys = []; // { label, pick: Object3D[], tip(toy), click(toy), apply(value), rate, target, value }
+let blinds = null;
+const WIN_BOTTOM = 0.80; // 창 아래 끝 높이(blender/room.py WIN)
+
+function setupToys(root) {
+  const get = (n) => root.getObjectByName(n);
+  const add = (toy) => (toys.push({ target: 0, value: 0, ...toy }), toys.at(-1));
+  const flip = (toy) => (toy.target = 1 - toy.target);
+
+  const cover = get("part__side_table_book_b_cover");
+  if (cover) {
+    const hit = hitBox(new THREE.Box3().setFromObject(cover).expandByVector(new THREE.Vector3(0, 0.03, 0)), 0.05);
+    scene.add(hit);
+    // 덮개는 등(+X 모서리)을 축으로 넘어가 책 오른쪽에 눕는다
+    add({ label: "책", pick: [hit], rate: 5, click: flip, tip: (t) => (t.target ? "눌러서 덮기" : "눌러서 펼치기"),
+      apply: (k) => (cover.rotation.z = -k * THREE.MathUtils.degToRad(172)) });
+  }
+
+  const pillow = get("part__armchair_pillow"), armchair = get("prop__armchair");
+  if (pillow && armchair) {
+    // 쿠션을 의자 반대쪽 구석으로 던져 옮긴다(의자 기준 x로 -0.18m, 기울기는 좌우 대칭)
+    const a = pillow.position.clone();
+    const b = a.clone().addScaledVector(new THREE.Vector3(1, 0, 0).applyQuaternion(armchair.quaternion), -0.18);
+    const yaw = THREE.MathUtils.degToRad(-16);
+    add({ label: "안락의자", pick: [armchair, pillow], rate: 6, click: flip, tip: () => "눌러서 쿠션 옮기기",
+      apply: (k) => {
+        pillow.position.lerpVectors(a, b, k);
+        pillow.position.y += 0.12 * Math.sin(Math.PI * k);
+        pillow.rotation.set(0, yaw * k + 0.6 * Math.sin(Math.PI * k), 0);
+      } });
+  }
+
+  const top = get("part__chair_top");
+  if (top) {
+    add({ label: "의자", pick: [get("prop__chair"), top].filter(Boolean), rate: 2.2, tip: () => "눌러서 돌리기",
+      click: (t) => (t.target += 2 * Math.PI), apply: (k) => (top.rotation.y = k) });
+  }
+
+  const slats = [];
+  for (let i = 0, o; (o = get(`part__blind_${String(i).padStart(2, "0")}`)); i++) slats.push(o);
+  const bar = get("part__blind_bottom");
+  if (slats.length && bar) {
+    // 걷어 올린 자리(GLB)에서 창턱 바로 위까지 같은 간격으로 내리고, 살을 기울여 빛을 가린다
+    const parts = [...slats, bar];
+    const up = parts.map((o) => o.position.y);
+    const gap = (up[0] - (WIN_BOTTOM + 0.05)) / slats.length;
+    const down = up.map((y, i) => up[0] - i * gap);
+    const hit = hitBox(new THREE.Box3().setFromPoints([B(-1.38, 1.33, WIN_BOTTOM), B(-0.32, 1.40, 2.08)]), 0);
+    scene.add(hit);
+    blinds = add({ label: "블라인드", pick: [hit], rate: 3, click: flip, tip: (t) => (t.target ? "눌러서 올리기" : "눌러서 내리기"),
+      apply: (k) => parts.forEach((o, i) => {
+        o.position.y = up[i] + (down[i] - up[i]) * k;
+        if (o !== bar) o.rotation.x = k * 1.05;
+      }) });
+  }
+}
+
+function stepToys(dt) {
+  for (const toy of toys) {
+    toy.value += (toy.target - toy.value) * Math.min(1, dt * toy.rate);
+    toy.apply(toy.value);
+  }
+  // 블라인드를 내리면 창으로 드는 빛이 줄어든다
+  windowLight.intensity = THEMES[theme].window * (1 - 0.75 * (blinds?.value ?? 0));
+}
+
+const toyOf = (hit) => {
+  for (let o = hit?.object; o; o = o.parent) {
+    const toy = toys.find((t) => t.pick.includes(o));
+    if (toy) return toy;
+  }
+  return null;
+};
 
 // ---------------------------------------------------------------- 상태
 
@@ -630,7 +720,7 @@ function unitOf(obj) {
 }
 
 const inRack = (obj) => { for (let o = obj; o; o = o.parent) if (o === rack) return true; return false; };
-const pickables = () => [rack, ...(monitor?.parts ?? []), ...switches.map((s) => s.hit), cat?.hit].filter(Boolean);
+const pickables = () => [rack, ...(monitor?.parts ?? []), ...switches.map((s) => s.hit), ...toys.flatMap((t) => t.pick), vacuum?.node].filter(Boolean);
 const switchOf = (hit) => hit && switches.find((s) => s.hit === hit.object);
 const onMonitor = (hit) => !!hit && monitor.parts.some((p) => { for (let o = hit.object; o; o = o.parent) if (o === p) return true; return false; });
 
@@ -647,7 +737,9 @@ renderer.domElement.addEventListener("pointermove", (e) => {
   renderer.domElement.style.cursor = hit ? "pointer" : "";
   const sw = switchOf(hit);
   if (sw) return showTip(e, `<b>${sw.label}</b><div class="row muted">눌러서 ${sw.on ? "끄기" : "켜기"}</div>`);
-  if (hit && isCat(hit.object)) return showTip(e, "<b>고양이</b><div class=\"row muted\">눌러서 깨우기</div>");
+  const toy = toyOf(hit);
+  if (toy) return showTip(e, `<b>${toy.label}</b><div class="row muted">${toy.tip(toy)}</div>`);
+  if (hit && isVacuum(hit.object)) return showTip(e, `<b>로봇 청소기</b><div class="row muted">${vacuumBusy() ? "청소 중 · 눌러서 충전대로" : "눌러서 청소 시작"}</div>`);
   if (onMonitor(hit)) return showTip(e, "<b>Grafana Cloud</b><div class=\"row muted\">최근 1시간 서버 지표 · 눌러서 크게 보기</div>");
   const unit = hit && unitOf(hit.object);
   if (!unit || unit.info.decor || !unit.info.containers?.length) return (tip.style.display = "none");
@@ -671,8 +763,12 @@ renderer.domElement.addEventListener("pointerup", (e) => {
   if (sw) {
     sw.on = !sw.on;
     tip.style.display = "none";
-  } else if (hit && isCat(hit.object)) {
-    wakeCat(clock.getElapsedTime(), true);
+  } else if (toyOf(hit)) {
+    toyOf(hit).click(toyOf(hit));
+    tip.style.display = "none";
+  } else if (hit && isVacuum(hit.object)) {
+    runVacuum(clock.getElapsedTime(), true);
+    tip.style.display = "none";
   } else if (onMonitor(hit)) {
     if (!monitorFocused) focusMonitor();
   } else if (hit) {
@@ -690,7 +786,8 @@ let lastT = 0;
 renderer.setAnimationLoop(() => {
   const t = clock.getElapsedTime();
   stepSwitches(t - lastT);
-  stepCat(t);
+  stepToys(t - lastT);
+  stepVacuum(t);
   lastT = t;
   const base = THEMES[theme].led;
   for (const led of leds.values()) {

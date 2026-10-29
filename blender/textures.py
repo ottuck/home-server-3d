@@ -116,35 +116,71 @@ def wood_planks(room_w, room_d, ppm=420, row=0.15, seed=5):
     return np.clip(a, 0, 1)
 
 
-def skyline(w=1600, h=700, night=False):
+def skyline(w=1200, h=1280, night=False):
+    """창밖 풍경. 그림 비율을 창 뒤 평면(1.5 × 1.6m)과 맞춰 창문이 늘어나지 않게 한다. 0번 줄이 아래다."""
     a = np.zeros((h, w, 4), dtype=np.float32)
     a[..., 3] = 1.0
     t = np.linspace(0, 1, h)[:, None]
-    if night:
-        top, bottom = np.array([0.010, 0.016, 0.045]), np.array([0.06, 0.07, 0.14])
-    else:
-        top, bottom = np.array([0.42, 0.62, 0.88]), np.array([0.92, 0.88, 0.80])
-    a[..., :3] = (bottom * (1 - t) + top * t)[:, None, :]
     rng = np.random.default_rng(11)
-    # 먼 건물과 가까운 건물 두 겹
-    for layer, (hmin, hmax, shade) in enumerate([(0.25, 0.55, 0.0), (0.12, 0.38, 1.0)]):
-        x = 0
+    # 건물 배치를 먼저 정해 낮과 밤이 같은 거리를 보게 한다: 먼 줄, 가까운 줄
+    layers = []
+    for hmin, hmax in [(0.30, 0.52), (0.16, 0.36)]:
+        row, x = [], 0
         while x < w:
-            bw = int(rng.integers(50, 150))
-            bh = int(h * rng.uniform(hmin, hmax))
-            if night:
-                col = np.array([0.025, 0.030, 0.060]) * (1 + shade * 0.4)
-            else:
-                col = np.array([0.70, 0.74, 0.80]) * (1 - shade * 0.12)
-            a[:bh, x:x + bw, :3] = col
-            # 창문
-            for wy in range(12, bh - 10, 16):
-                for wx in range(x + 8, x + bw - 10, 14):
-                    if night and rng.random() < 0.38:
-                        warm = rng.random() < 0.7
-                        c = np.array([1.0, 0.78, 0.45]) if warm else np.array([0.75, 0.85, 1.0])
-                        a[wy:wy + 7, wx:wx + 6, :3] = c * rng.uniform(0.5, 1.0)
-                    elif not night and rng.random() < 0.5:
-                        a[wy:wy + 7, wx:wx + 6, :3] = col * 0.85 + np.array([0.05, 0.07, 0.10])
-            x += bw + int(rng.integers(0, 12))
-    return a
+            bw = int(rng.integers(60, 150))
+            row.append((x, bw, int(h * rng.uniform(hmin, hmax))))
+            x += bw + int(rng.integers(0, 10))
+        layers.append(row)
+    if not night:
+        top, bottom = np.array([0.42, 0.62, 0.88]), np.array([0.92, 0.88, 0.80])
+        a[..., :3] = (bottom * (1 - t) + top * t)[:, None, :]
+        for k, row in enumerate(layers):
+            col = np.array([0.70, 0.74, 0.80]) * (1 - k * 0.12)
+            for x, bw, bh in row:
+                a[:bh, x:x + bw, :3] = col
+                for wy in range(14, bh - 14, 24):
+                    for wx in range(x + 10, x + bw - 14, 18):
+                        if rng.random() < 0.5:
+                            a[wy:wy + 11, wx:wx + 8, :3] = col * 0.85 + np.array([0.05, 0.07, 0.10])
+        return a
+
+    # 밤: 지평선 쪽이 도시 불빛으로 옅게 밝은 하늘, 달 하나, 별 조금, 불 켜진 창은 드문드문
+    top, bottom = np.array([0.008, 0.012, 0.035]), np.array([0.075, 0.075, 0.140])
+    sky = bottom * (1 - t ** 0.55) + top * t ** 0.55
+    sky = sky + np.array([0.09, 0.05, 0.03]) * np.exp(-t / 0.10)
+    a[..., :3] = sky[:, None, :]
+    yy, xx = np.mgrid[0:h, 0:w]
+    mx, my, mr = w * 0.74, h * 0.80, 30
+    d = np.hypot(xx - mx, yy - my)
+    a[..., :3] += np.array([0.55, 0.55, 0.62]) * (0.18 * np.exp(-np.maximum(d - mr, 0) / 70))[..., None]
+    disc = np.clip(mr + 1 - d, 0, 1)[..., None]
+    a[..., :3] = a[..., :3] * (1 - disc) + np.array([0.96, 0.93, 0.84]) * disc
+    for _ in range(60):
+        sx, sy = int(rng.integers(2, w - 2)), int(rng.integers(int(h * 0.55), h - 2))
+        if np.hypot(sx - mx, sy - my) < mr * 3:
+            continue
+        b = rng.uniform(0.35, 0.9)
+        a[sy, sx, :3] = np.array([0.85, 0.88, 1.0]) * b
+        for ox, oy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            a[sy + oy, sx + ox, :3] = np.maximum(a[sy + oy, sx + ox, :3], np.array([0.85, 0.88, 1.0]) * b * 0.3)
+    for k, row in enumerate(layers):
+        far = k == 0
+        base = np.array([0.050, 0.058, 0.105]) if far else np.array([0.022, 0.026, 0.050])
+        for x, bw, bh in row:
+            # 아래쪽이 거리 불빛을 받아 조금 밝다
+            shade = 1 + 0.6 * (1 - np.arange(bh) / bh) ** 3
+            a[:bh, x:x + bw, :3] = base * shade[:, None, None]
+            for wy in range(16, bh - 16, 26 if not far else 22):
+                if rng.random() < (0.55 if far else 0.45):
+                    continue  # 불 꺼진 층
+                for wx in range(x + 10, x + bw - 14, 18 if not far else 16):
+                    if rng.random() < 0.45:
+                        c = np.array([1.0, 0.76, 0.42]) if rng.random() < 0.8 else np.array([0.72, 0.82, 1.0])
+                        c = c * rng.uniform(0.45, 0.85) * (0.55 if far else 1.0)
+                        ww, wh = (6, 8) if far else (8, 11)
+                        a[wy - 1:wy + wh + 1, wx - 1:wx + ww + 1, :3] = np.maximum(a[wy - 1:wy + wh + 1, wx - 1:wx + ww + 1, :3], c * 0.25)
+                        a[wy:wy + wh, wx:wx + ww, :3] = c
+        tall = max(row, key=lambda r: r[2])
+        lx, ly = tall[0] + tall[1] // 2, tall[2] + 4
+        a[ly - 2:ly + 3, lx - 2:lx + 3, :3] = np.array([1.0, 0.25, 0.18]) * (0.5 if far else 0.9)
+    return np.clip(a, 0, 1)

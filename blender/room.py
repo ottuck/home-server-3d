@@ -59,7 +59,7 @@ def shell(m, night, col):
         box(nm, size, loc, m.black_metal, bevel=0.004, col=col)
     box("win_sill", (wx1 - wx0 + 0.10, 0.20, 0.035), (cx, Y1 - 0.03, wz0 - 0.0175), m.wood, bevel=0.008, col=col)
     # 창밖 풍경
-    sky = image("skyline_night" if night else "skyline_day", 1600, 700, tx.skyline(night=night))
+    sky = image("skyline_night" if night else "skyline_day", 1200, 1280, tx.skyline(night=night))
     smat = screen_mat("skyline", sky, strength=1.0)
     # 정사영 카메라라 창을 지나는 시선이 모두 평행하다. 창 바로 뒤에 두어 창으로만 보이게 한다.
     screen_plane("skyline", 1.5, 1.6, (cx - 0.37, Y1 + 0.55, 1.0), smat, col=col)
@@ -94,7 +94,10 @@ def layout(m, night, col, rack_root, cable_mats):
     props.rug(m, "rug", (0.15, -0.42, 0), col)
     props.armchair(m, "armchair", (1.25, -0.70, 0), -58, col)
     props.side_table(m, "side_table", (0.62, -1.12, 0), col)
-    props.cat(m, "cat", (-0.30, -0.22, 0.014), 25, col)
+    # 로봇 청소기는 창 아래 충전대에 붙어 있다가 웹에서 방을 돈다
+    props.dock(m, "dock", (-0.62, Y1 - 0.07, 0), 0, col)
+    props.vacuum(m, (-0.62, Y1 - 0.25, 0), col)
+    props.blinds(m, "blinds", WIN[0] - 0.03, WIN[1] + 0.03, WIN[3] + 0.035, Y1 - 0.035, col)
     props.plant(m, "plant_window", (-0.12, 1.12, 0), col, height=0.55, pot=1, seed=12)
 
 

@@ -1,12 +1,14 @@
 """웹용 GLB 내보내기: 수정자·글자를 메시로 굳히고 소품·장비 단위로 합친 뒤 Draco로 압축한다.
 
-남기는 것(웹에서 따로 다룬다): unit__* 빈 객체(extras 포함), led__* LED, *_screen 화면, skyline 창밖 그림.
+남기는 것(웹에서 따로 다룬다): unit__* 빈 객체(extras 포함), led__* LED, *_screen 화면, skyline 창밖 그림,
+part__* 움직이는 부분(빈 객체면 자식을 합치고 원점을 빈 객체 자리에 둔다. 회전·크기는 메시에 굳힌다).
 """
 import os
 
 import bpy
 
 KEEP_SUFFIX = ("_screen",)
+PART = "part__"
 
 
 def _keep(ob):
@@ -64,6 +66,24 @@ def _join(meshes, name, parent):
     return ob
 
 
+def _split_parts(col):
+    """part__* 를 소품에서 떼어 최상위 메시로 만든다."""
+    for p in [o for o in col.all_objects if o.name.startswith(PART)]:
+        if p.type != "EMPTY":
+            _unparent(p)
+            continue
+        name, pivot = p.name, p.matrix_world.translation.copy()
+        ob = _join(_descendants(p), name + "_mesh", None)
+        bpy.data.objects.remove(p)
+        bpy.ops.object.select_all(action="DESELECT")
+        ob.select_set(True)
+        bpy.context.view_layer.objects.active = ob
+        bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+        bpy.context.scene.cursor.location = pivot
+        bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
+        ob.name = ob.data.name = name
+
+
 def optimize():
     """씬의 메시를 묶음별로 합친다. 반환: 합친 뒤 메시 수."""
     _bake_geometry(list(bpy.context.scene.objects))
@@ -83,13 +103,14 @@ def optimize():
         _join([d for d in frame if d.type == "MESH" and not _keep(d)], "rack_frame", rack)
     room_col = bpy.data.collections.get("room")
     if room_col is not None:
+        _split_parts(room_col)
         roots = [o for o in room_col.objects if o.parent is None and o.type == "EMPTY"]
         for r in roots:
             parts = _descendants(r)
             for s in [p for p in parts if _keep(p)]:
                 _unparent(s)
             _join([p for p in parts if not _keep(p)], f"prop__{r.name}", None)
-        loose = [o for o in room_col.objects if o.parent is None and o.type == "MESH" and not _keep(o) and not o.name.startswith("prop__")]
+        loose = [o for o in room_col.objects if o.parent is None and o.type == "MESH" and not _keep(o) and not o.name.startswith(("prop__", PART))]
         _join(loose, "room_shell", None)
     # 자식이 없어진 빈 객체 정리(unit__·rack은 남긴다)
     for o in list(bpy.context.scene.objects):

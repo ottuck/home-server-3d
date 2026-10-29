@@ -71,7 +71,7 @@ def main():
         # 밤 창밖 그림은 웹이 테마를 바꿀 때 갈아 끼운다
         tex_dir = os.path.join(os.path.dirname(glb), "textures")
         os.makedirs(tex_dir, exist_ok=True)
-        night_sky = lib.image("skyline_night_export", 1600, 700, textures.skyline(night=True))
+        night_sky = lib.image("skyline_night_export", 1200, 1280, textures.skyline(night=True))
         night_sky.filepath_raw = os.path.join(tex_dir, "skyline_night.png")
         night_sky.file_format = "PNG"
         night_sky.save()

@@ -2,6 +2,7 @@
 import math
 
 import bpy
+import numpy as np
 from mathutils import Euler
 
 import props
@@ -81,8 +82,9 @@ def layout(m, night, col, rack_root, cable_mats):
               0.0055, cable_mats[k % len(cable_mats)], col=col)
     props.plant(m, "plant_corner", (-1.42, 1.10, 0), col, height=1.0, pot=0, seed=3)
     # 왼쪽 벽: 작업 책상, 의자, 선반, 간판
-    shots = [image("tex_code_a", 480, 300, tx.code(seed=3)), image("tex_code_b", 480, 300, tx.code(seed=9))]
-    props.desk(m, "desk", (X0 + 0.35, 0.05, 0), 90, col, shots)
+    # 와이드 모니터: 좌우로 나눈 에디터 두 칸
+    code = np.concatenate([tx.code(w=420, h=340, seed=3), tx.code(w=420, h=340, seed=9)], axis=1)
+    props.desk(m, "desk", (X0 + 0.35, 0.05, 0), 90, col, image("tex_code", 840, 340, code))
     props.chair(m, "chair", (-0.80, 0.02, 0), -78, col)
     props.wall_shelf(m, "shelf_low", (X0 + 0.12, 0.10, 1.38), 90, col, length=1.15, seed=2)
     props.wall_shelf(m, "shelf_high", (X0 + 0.12, 0.30, 1.76), 90, col, length=0.80, seed=6, decor=False)

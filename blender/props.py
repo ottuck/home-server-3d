@@ -130,7 +130,7 @@ def desk_lamp(m, name, loc, rotz, root, col):
     sphere(f"{name}_bulb", 0.025, (0, -0.155, 0.355), m.bulb, parent=r, col=col)
 
 
-def desk(m, name, loc, rotz, col, screens):
+def desk(m, name, loc, rotz, col, screen):
     root = _root(name, loc, rotz, col)
     top_z = 0.72
     box(f"{name}_top", (1.36, 0.66, 0.035), (0, 0, top_z + 0.0175), m.wood, bevel=0.010, parent=root, col=col)
@@ -144,8 +144,8 @@ def desk(m, name, loc, rotz, col, screens):
         box(f"{name}_leg_{sy}", (0.035, 0.035, top_z), (0.62, sy * 0.27, top_z / 2), m.black_metal, bevel=0.006, parent=root, col=col)
     box(f"{name}_leg_bar", (0.03, 0.54, 0.03), (0.62, 0, 0.08), m.black_metal, bevel=0.006, parent=root, col=col)
     z = top_z + 0.035
-    monitor(m, f"{name}_mon_l", (-0.29, 0.10, z), -10, screens[0], root, col)
-    monitor(m, f"{name}_mon_r", (0.30, 0.10, z), 10, screens[1], root, col)
+    # 정면을 보는 와이드 모니터 한 대(34인치급, 21:9)
+    monitor(m, f"{name}_mon", (0.0, 0.10, z), 0, screen, root, col, w=0.84, h=0.36)
     keyboard(m, f"{name}_kbd", (0.0, -0.16, z), root, col)
     sphere(f"{name}_mouse", 0.03, (0.30, -0.17, z + 0.012), m.charcoal, scale=(0.75, 1.0, 0.45), parent=root, col=col)
     mug(m, f"{name}_mug", (-0.42, -0.16, z), root, col)

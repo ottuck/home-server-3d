@@ -1,0 +1,29 @@
+{
+  "$comment": "3D 장면과 웹이 함께 읽는 장비 목록. containers는 cAdvisor container 라벨 값(2026-10-29 Grafana Cloud 실측). decor는 실제 장비가 아닌 장식.",
+  "host": {
+    "id": "quant-lab-02",
+    "title": "quant-lab-02",
+    "subtitle": "AWS Lightsail · 2 GB",
+    "rackUnits": 22
+  },
+  "units": [
+    { "id": "edge", "kind": "patch", "u": 1, "label": "EDGE",
+      "containers": ["puny-chat-caddy-1", "quant-lab-prod-cloudflared-1", "ur-check-prod-cloudflared-1"] },
+    { "id": "network", "kind": "switch", "u": 1, "label": "NETWORK", "containers": [] },
+    { "id": "blank-1", "kind": "blank", "u": 1, "decor": true },
+    { "id": "puny-chat", "kind": "server", "u": 2, "label": "PUNY CHAT",
+      "containers": ["puny-chat-server-1"] },
+    { "id": "ur-check", "kind": "server", "u": 2, "label": "UR CHECK",
+      "containers": ["ur-check-prod-app-1", "ur-check-prod-postgres-1"] },
+    { "id": "quant-lab", "kind": "server", "u": 3, "label": "QUANT LAB",
+      "containers": ["quant-lab-prod-api-1", "quant-lab-prod-worker-1", "quant-lab-prod-db-1"] },
+    { "id": "quant-lab-demo", "kind": "server", "u": 2, "label": "QUANT LAB DEMO",
+      "containers": ["quant-lab-demo-demo-api-1", "quant-lab-demo-demo-seeder-1"] },
+    { "id": "monitoring", "kind": "server", "u": 1, "label": "MONITORING",
+      "containers": ["monitoring-alloy-1", "monitoring-docker-proxy-1"] },
+    { "id": "blank-2", "kind": "blank", "u": 1, "decor": true },
+    { "id": "disk", "kind": "storage", "u": 2, "label": "DISK", "containers": [] },
+    { "id": "blank-3", "kind": "blank", "u": 1, "decor": true },
+    { "id": "power", "kind": "ups", "u": 2, "label": "POWER", "decor": true, "containers": [] }
+  ]
+}

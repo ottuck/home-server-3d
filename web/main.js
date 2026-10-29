@@ -34,12 +34,12 @@ const PAN_MIN = B(-1.7, 1.4, 0.3), PAN_MAX = B(1.7, -1.4, 1.8);
 // blender/room.py THEMES의 조명을 three.js 조명으로 옮긴 값. 강도는 눈으로 맞췄다.
 const THEMES = {
   day: {
-    bg: 0xeee8df, hemi: 1.5, sun: 3.0, env: 0.6, window: 1.2, lamps: 0, rack: 0,
-    shade: 0, bulb: 0.3, sign: 0, screen: 0.7, led: 7, bloom: [0.25, 0.3, 2.2],
+    bg: 0xeee8df, hemi: 1.5, sun: 3.0, env: 0.6, window: 1.2, lamps: false, rack: 0,
+    screen: 0.7, led: 7, bloom: [0.25, 0.3, 2.2],
   },
   night: {
-    bg: 0x1a2340, hemi: 0.10, sun: 0, env: 0.05, window: 0.6, lamps: 1, rack: 1.2,
-    shade: 0.75, bulb: 2.2, sign: 2.2, screen: 1.0, led: 14, bloom: [0.45, 0.3, 1.0],
+    bg: 0x1a2340, hemi: 0.10, sun: 0, env: 0.05, window: 0.6, lamps: true, rack: 1.2,
+    screen: 1.0, led: 14, bloom: [0.45, 0.3, 1.0],
   },
 };
 
@@ -156,7 +156,7 @@ let history = null;
 let rack = null;
 let infra = null;
 let status = null;
-globalThis.viewer = { leds, units, mats, scene, camera, get status() { return status; } }; // 콘솔 디버깅용
+globalThis.viewer = { leds, units, mats, scene, camera, get status() { return status; }, get cat() { return cat; }, get switches() { return switches; } }; // 콘솔 디버깅용
 
 function setupScene(gltf, nightSky) {
   const root = gltf.scene;
@@ -200,6 +200,8 @@ function setupScene(gltf, nightSky) {
   scene.add(root);
   root.updateMatrixWorld(true); // 첫 렌더 전에 장비 위치(이름표 기준점)를 계산하려면 필요하다
   makeTags();
+  setupSwitches(root);
+  setupCat(root.getObjectByName("prop__cat"));
 }
 
 // 벽 모니터의 장식 그림을 실제 그래프 캔버스로 바꾼다(glTF UV에 맞춰 flipY 끔).
@@ -225,13 +227,6 @@ function paintMonitor() {
 
 // ---------------------------------------------------------------- 테마
 
-const GLOW = {
-  // Blender에서 낮 테마로 내보내 빛이 꺼진 재질은 여기서 색을 다시 준다
-  lamp_shade: [1.0, 0.78, 0.50, "shade"],
-  bulb: [1.0, 0.80, 0.55, "bulb"],
-  sign_glow: [1.0, 0.72, 0.40, "sign"],
-};
-
 let theme = "day";
 function applyTheme(name) {
   theme = name;
@@ -245,14 +240,8 @@ function applyTheme(name) {
   scene.environmentIntensity = t.env;
   windowLight.intensity = t.window;
   windowLight.color.set(name === "day" ? 0xfff0d8 : 0x8ea4ff);
-  for (const l of lamps) l.intensity = l.userData.power * t.lamps;
+  for (const s of switches) s.on = t.lamps; // 테마를 바꾸면 눌러서 바꾼 조명도 그 테마 기본으로 돌아간다
   rackLight.intensity = t.rack;
-  for (const [mat, [r, g, b, key]] of Object.entries(GLOW)) {
-    const m = mats.get(mat);
-    if (!m) continue;
-    m.emissive.setRGB(r, g, b);
-    m.emissiveIntensity = t[key];
-  }
   for (const m of screens) m.emissiveIntensity = t.screen;
   if (skyline) {
     const tex = name === "day" ? skyline.day : skyline.night;
@@ -456,6 +445,141 @@ function placeTags() {
 $("back").onclick = home;
 addEventListener("keydown", (e) => e.key === "Escape" && (focused || monitorFocused) && home());
 
+// ---------------------------------------------------------------- 조명 스위치, 고양이
+
+// 눌러서 켜고 끄는 조명. light는 위 lamps의 순서이고, 간판은 점 조명 없이 글자만 빛난다.
+const SWITCHES = [
+  { node: "prop__floor_lamp", label: "스탠드", light: 0 },
+  { node: "prop__desk", only: "bulb", label: "책상 스탠드", light: 1 },
+  { node: "prop__table_lamp", label: "탁상등", light: 2 },
+  { node: "prop__sconce", label: "벽등", light: 3 },
+  { node: "prop__sign", label: "HOME LAB 간판" },
+];
+// Blender에서 낮 테마로 내보내 빛이 꺼진 재질에 다시 줄 발광: [r, g, b, 켰을 때 세기, 껐을 때 세기]
+const GLOW = {
+  lamp_shade: [1.0, 0.78, 0.50, 0.75, 0],
+  bulb: [1.0, 0.80, 0.55, 2.2, 0.3],
+  sign_glow: [1.0, 0.72, 0.40, 2.2, 0],
+};
+const switches = []; // { label, light, glow: 재질[], hit: 투명 상자, on, level }
+
+function setupSwitches(root) {
+  for (const s of SWITCHES) {
+    const node = root.getObjectByName(s.node);
+    if (!node) continue;
+    const glow = [];
+    const zone = new THREE.Box3();
+    node.traverse((o) => {
+      if (!o.isMesh || !GLOW[o.material.name] || (s.only && o.material.name !== s.only)) return;
+      o.material = o.material.clone(); // 같은 재질을 여러 조명이 나눠 쓰므로 따로 켜고 끄려면 복제한다
+      o.material.emissive.setRGB(...GLOW[o.material.name].slice(0, 3));
+      glow.push(o.material);
+      zone.expandByObject(o);
+    });
+    if (!s.only) zone.setFromObject(node);
+    // 가는 기둥이나 작은 전구도 누르기 쉽게 조금 넉넉한 투명 상자로 고른다
+    const size = zone.getSize(new THREE.Vector3()).addScalar(s.only ? 0.2 : 0.06);
+    const hit = new THREE.Mesh(new THREE.BoxGeometry(size.x, size.y, size.z), new THREE.MeshBasicMaterial({ visible: false }));
+    zone.getCenter(hit.position);
+    scene.add(hit);
+    switches.push({ label: s.label, light: s.light, glow, hit, on: false, level: 0 });
+  }
+}
+
+function stepSwitches(dt) {
+  const k = Math.min(1, dt * 12);
+  for (const s of switches) {
+    s.level += (+s.on - s.level) * k;
+    for (const m of s.glow) {
+      const [, , , on, off] = GLOW[m.name];
+      m.emissiveIntensity = off + (on - off) * s.level;
+    }
+    if (s.light != null) lamps[s.light].intensity = lamps[s.light].userData.power * s.level;
+  }
+}
+
+// 고양이: 숨 쉬듯 조금씩 부풀고, 누르거나 가끔 저절로 일어나 다른 자리로 걸어간다.
+// 자리는 가구와 겹치지 않고, 서로 곧게 오갈 수 있고, 기본 구도에서 가려지지 않는 바닥(Blender x, y)이다.
+const CAT_SPOTS = [[-0.30, -0.22], [0.10, 0.40], [-0.10, -0.75], [-0.75, -0.95], [0.20, -0.20]].map(([x, y]) => B(x, y, 0));
+const CAT_SPEED = 0.45; // m/s
+const HOP = 0.45; // 제자리에서 펄쩍 뛰며 돌아서는 시간(초)
+let cat = null; // { node, hit, scale, y, heading, move, bubble, nextWander }
+
+function setupCat(node) {
+  if (!node) return;
+  // 합친 메시라 노드에 몸통 크기만큼의 scale이 들어 있다. 투명 상자도 노드 안에 넉넉하게 둔다.
+  const box = new THREE.Box3();
+  node.traverse((o) => {
+    if (!o.isMesh) return;
+    o.geometry.computeBoundingBox();
+    box.union(o.geometry.boundingBox);
+  });
+  const size = box.getSize(new THREE.Vector3()).multiplyScalar(1.4);
+  const hit = new THREE.Mesh(new THREE.BoxGeometry(size.x, size.y, size.z), new THREE.MeshBasicMaterial({ visible: false }));
+  box.getCenter(hit.position);
+  node.add(hit);
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.textContent = "야옹";
+  $("tags").append(bubble);
+  cat = { node, hit, scale: node.scale.clone(), y: node.position.y, heading: node.rotation.y, move: null, bubble, nextWander: 40 };
+}
+
+const isCat = (obj) => { for (let o = obj; o; o = o.parent) if (o === cat?.node) return true; return false; };
+
+function wakeCat(t, meow) {
+  if (!cat || cat.move) return;
+  const here = cat.node.position;
+  const far = CAT_SPOTS.filter((p) => Math.hypot(p.x - here.x, p.z - here.z) > 0.3);
+  const to = far[Math.floor(Math.random() * far.length)];
+  const d = Math.hypot(to.x - here.x, to.z - here.z);
+  let turn = Math.atan2(to.x - here.x, to.z - here.z) - cat.heading; // 머리는 노드의 +Z 쪽
+  turn = Math.atan2(Math.sin(turn), Math.cos(turn));
+  cat.move = { t0: t, from: here.clone(), to: to.clone().setY(cat.y), d, h0: cat.heading, turn, meow };
+}
+
+function stepCat(t) {
+  if (!cat) return;
+  const { node, scale } = cat;
+  const m = cat.move;
+  if (!m) {
+    cat.bubble.classList.remove("show");
+    const b = Math.sin(t * 2.2); // 숨쉬기
+    node.scale.set(scale.x * (1 + 0.012 * b), scale.y * (1 + 0.02 * b), scale.z * (1 + 0.012 * b));
+    if (t > cat.nextWander) wakeCat(t, false);
+    return;
+  }
+  const e = t - m.t0;
+  const walk = m.d / CAT_SPEED;
+  if (e < HOP) {
+    const k = e / HOP;
+    node.position.y = cat.y + 0.07 * Math.sin(Math.PI * k);
+    cat.heading = m.h0 + m.turn * (1 - (1 - k) ** 2);
+    const s = 1 + 0.12 * Math.sin(Math.PI * k); // 뛰는 동안 몸을 길게 편다
+    node.scale.set(scale.x / Math.sqrt(s), scale.y, scale.z * s);
+  } else if (e < HOP + walk) {
+    const k = (e - HOP) / walk;
+    const q = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+    node.position.lerpVectors(m.from, m.to, q);
+    node.position.y = cat.y + 0.012 * Math.abs(Math.sin((Math.PI * q * m.d) / 0.11)); // 총총걸음
+    cat.heading = m.h0 + m.turn;
+    node.scale.copy(scale);
+  } else {
+    node.position.copy(m.to);
+    node.scale.copy(scale);
+    cat.move = null;
+    cat.nextWander = t + 35 + Math.random() * 40;
+  }
+  node.rotation.set(0, cat.heading, 0);
+  const show = m.meow && e < 1.6;
+  cat.bubble.classList.toggle("show", show);
+  if (show) {
+    v.copy(node.position).setY(cat.y + 0.2).project(camera);
+    cat.bubble.style.left = `${((v.x + 1) / 2) * stage.clientWidth}px`;
+    cat.bubble.style.top = `${((1 - v.y) / 2) * stage.clientHeight}px`;
+  }
+}
+
 // ---------------------------------------------------------------- 상태
 
 function paintLeds() {
@@ -506,20 +630,25 @@ function unitOf(obj) {
 }
 
 const inRack = (obj) => { for (let o = obj; o; o = o.parent) if (o === rack) return true; return false; };
-const pickables = () => [rack, ...(monitor?.parts ?? [])].filter(Boolean);
-const onMonitor = (hit) => !!hit && !inRack(hit.object);
+const pickables = () => [rack, ...(monitor?.parts ?? []), ...switches.map((s) => s.hit), cat?.hit].filter(Boolean);
+const switchOf = (hit) => hit && switches.find((s) => s.hit === hit.object);
+const onMonitor = (hit) => !!hit && monitor.parts.some((p) => { for (let o = hit.object; o; o = o.parent) if (o === p) return true; return false; });
+
+function showTip(e, html) {
+  tip.innerHTML = html;
+  tip.style.display = "block";
+  tip.style.left = `${Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8)}px`;
+  tip.style.top = `${Math.min(e.clientY + 14, innerHeight - tip.offsetHeight - 8)}px`;
+}
 
 renderer.domElement.addEventListener("pointermove", (e) => {
   if (!infra || !rack || e.buttons) return (tip.style.display = "none");
   const hit = pick(e, pickables());
   renderer.domElement.style.cursor = hit ? "pointer" : "";
-  if (onMonitor(hit)) {
-    tip.innerHTML = "<b>Grafana Cloud</b><div class=\"row muted\">최근 1시간 서버 지표 · 눌러서 크게 보기</div>";
-    tip.style.display = "block";
-    tip.style.left = `${Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8)}px`;
-    tip.style.top = `${Math.min(e.clientY + 14, innerHeight - tip.offsetHeight - 8)}px`;
-    return;
-  }
+  const sw = switchOf(hit);
+  if (sw) return showTip(e, `<b>${sw.label}</b><div class="row muted">눌러서 ${sw.on ? "끄기" : "켜기"}</div>`);
+  if (hit && isCat(hit.object)) return showTip(e, "<b>고양이</b><div class=\"row muted\">눌러서 깨우기</div>");
+  if (onMonitor(hit)) return showTip(e, "<b>Grafana Cloud</b><div class=\"row muted\">최근 1시간 서버 지표 · 눌러서 크게 보기</div>");
   const unit = hit && unitOf(hit.object);
   if (!unit || unit.info.decor || !unit.info.containers?.length) return (tip.style.display = "none");
   const { info } = unit;
@@ -528,10 +657,7 @@ renderer.domElement.addEventListener("pointermove", (e) => {
     return `<div class="row"><i class="dot ${s}"></i>${c.name} <span class="muted">${STATUS_LABEL[s]}</span></div>`;
   });
   const us = unitStatus(status, info);
-  tip.innerHTML = `<b>${info.label}${us ? ` <i class="dot ${us}"></i>` : ""}</b>${rows.join("")}`;
-  tip.style.display = "block";
-  tip.style.left = `${Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8)}px`;
-  tip.style.top = `${Math.min(e.clientY + 14, innerHeight - tip.offsetHeight - 8)}px`;
+  showTip(e, `<b>${info.label}${us ? ` <i class="dot ${us}"></i>` : ""}</b>${rows.join("")}`);
 });
 renderer.domElement.addEventListener("pointerleave", () => (tip.style.display = "none"));
 
@@ -541,7 +667,13 @@ renderer.domElement.addEventListener("pointerdown", (e) => (down = [e.clientX, e
 renderer.domElement.addEventListener("pointerup", (e) => {
   if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 6 || !rack) return;
   const hit = pick(e, pickables());
-  if (onMonitor(hit)) {
+  const sw = switchOf(hit);
+  if (sw) {
+    sw.on = !sw.on;
+    tip.style.display = "none";
+  } else if (hit && isCat(hit.object)) {
+    wakeCat(clock.getElapsedTime(), true);
+  } else if (onMonitor(hit)) {
     if (!monitorFocused) focusMonitor();
   } else if (hit) {
     const unit = unitOf(hit.object);
@@ -554,8 +686,12 @@ renderer.domElement.addEventListener("pointerup", (e) => {
 
 // ---------------------------------------------------------------- 시작
 
+let lastT = 0;
 renderer.setAnimationLoop(() => {
   const t = clock.getElapsedTime();
+  stepSwitches(t - lastT);
+  stepCat(t);
+  lastT = t;
   const base = THEMES[theme].led;
   for (const led of leds.values()) {
     // 오류는 깜박이고, 데이터 없음은 꺼진 것처럼 어둡게 둔다.

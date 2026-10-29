@@ -87,6 +87,35 @@ def issues(w=300, h=200):
     return a
 
 
+def wood_planks(room_w, room_d, ppm=420, row=0.15, seed=5):
+    """나무 바닥 판자(sRGB). 폭 room_w·깊이 room_d(m) 전체를 한 장에 그린다."""
+    rng = np.random.default_rng(seed)
+    w, h = int(room_w * ppm), int(room_d * ppm)
+    a = canvas(w, h, (0.70, 0.52, 0.35))
+    rh = int(row * ppm)
+    xs = np.arange(w)
+    for r in range(h // rh + 1):
+        y0, y1 = r * rh, min((r + 1) * rh, h)
+        if y0 >= h:
+            break
+        x = -int(rng.uniform(0, 1.2) * ppm)
+        while x < w:
+            ln = int(rng.uniform(0.7, 1.4) * ppm)
+            x0, x1 = max(x, 0), min(x + ln, w)
+            if x1 > x0:
+                tone = rng.uniform(0.88, 1.10)
+                base = np.array([0.74, 0.56, 0.38]) * tone
+                # 결: 판자마다 다른 위상의 가는 줄무늬
+                phase = rng.uniform(0, 6.28)
+                yy = np.arange(y0, y1)[:, None]
+                grain = 1 + 0.035 * np.sin(yy * 0.9 + np.sin(xs[None, x0:x1] * 0.01 + phase) * 3)
+                a[y0:y1, x0:x1, :3] = base * grain[..., None]
+                a[y0:y1, x0:min(x0 + 2, x1), :3] *= 0.72  # 판자 끝 이음매
+            x += ln
+        a[y0:min(y0 + 2, h), :, :3] *= 0.70  # 줄 사이 틈
+    return np.clip(a, 0, 1)
+
+
 def skyline(w=1600, h=700, night=False):
     a = np.zeros((h, w, 4), dtype=np.float32)
     a[..., 3] = 1.0

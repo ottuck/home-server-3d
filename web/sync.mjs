@@ -9,9 +9,10 @@ const web = dirname(fileURLToPath(import.meta.url));
 const root = join(web, "..");
 const out = join(web, "data");
 
-mkdirSync(out, { recursive: true });
+mkdirSync(join(out, "textures"), { recursive: true });
 for (const [src, dst] of [
-  ["assets/rack.glb", "rack.glb"],
+  ["assets/scene.glb", "scene.glb"],
+  ["assets/textures/skyline_night.png", "textures/skyline_night.png"],
   ["shared/infra.json", "infra.json"],
 ]) {
   copyFileSync(join(root, src), join(out, dst));

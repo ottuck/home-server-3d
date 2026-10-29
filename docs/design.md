@@ -35,8 +35,18 @@
   - `*_screen`: 화면. 웹이 실시간 그림으로 바꿔 끼운다
   - `skyline`: 창밖 풍경. 밤 그림은 `assets/textures/skyline_night.png`
   - 나머지: `prop__<소품>`, `rack_frame`, `room_shell`로 합쳐 둔다
-- GLB는 낮 테마 재질로 내보내고 Draco로 압축한다(`scene.glb` 메시 54개·817KB, `rack.glb` 메시 34개·414KB). 웹에서는 DRACOLoader가 필요하다.
+- GLB는 낮 테마 재질로 내보내고 Draco로 압축한다(`scene.glb` 메시 54개·1.45MB, 그중 바닥 그림이 약 0.6MB; `rack.glb` 메시 34개·414KB). 웹에서는 DRACOLoader가 필요하다.
 - 낮/밤은 같은 모델을 쓰고 조명과 LED 밝기만 바꾼다. 밤에는 랙 앞 윗프레임 아래의 숨은 조명과 블룸을 켠다.
+
+## 웹 뷰어 (`web/`, three.js, 빌드 없음)
+
+- 실행: `node web/sync.mjs`로 `scene.glb`·밤 창밖 그림·`infra.json`을 `web/data/`에 복사한 뒤, `web/`을 정적 서버로 띄운다.
+- 카메라: Blender 방 카메라와 같은 정사영 구도(tilt 58°, yaw 40°)다. 회전은 좌우 ±25°, 상하 -14~+10°로 제한하고, 확대는 0.9~4배다. 팬은 방 바닥 안으로 묶는다.
+- 조명: Blender 조명은 GLB에 들어가지 않으므로 뷰어가 같은 위치에 다시 둔다(해, 창, 스탠드·책상등·탁상등·벽등, 랙 앞 빛).
+- 낮/밤: 조명 세기, 창밖 그림, 전등갓·전구·간판 발광, 화면 밝기, 블룸을 바꾼다. 처음에는 OS 다크 모드를 따른다.
+- 바닥은 Blender에서도 이미지 텍스처(`textures.wood_planks`)를 쓴다. 절차 텍스처는 GLB로 나가지 않기 때문이다.
+- Blender 코트(clearcoat)는 glTF에서 거울처럼 매끈해지므로 뷰어에서 거칠기를 0.4 이상으로 올린다.
+- 벽에 붙이는 소품은 벽면과 같은 평면에 두지 않는다. Cycles에서는 보여도 웹에서는 벽에 가려진다.
 
 ## 상태 색
 
@@ -48,5 +58,5 @@ Cloudflare Pages(정적 웹)와 Cloudflare Worker를 쓴다. Worker가 읽기 �
 
 ## 남은 일
 
-- 웹 뷰어(`web/`, three.js, `node web/sync.mjs`로 데이터 복사)는 지금 `rack.glb`만 보여 준다. 다음으로 `scene.glb`를 불러 고정 아이소메트릭 카메라와 낮/밤 전환(창밖 그림 교체 포함)을 붙인다.
+- 웹에서 더 Cycles 같은 그림자·간접광이 필요하면 SSAO(화면 공간 주변광 가림)나 조명 굽기를 검토한다.
 - 웹에서 Cycles 분위기를 내려면 조명을 Blender에서 굽는다(bake, 낮/밤 두 벌). 먼저 실시간 조명 + 블룸으로 시작하고 차이를 보고 정한다.

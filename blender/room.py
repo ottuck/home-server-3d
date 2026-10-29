@@ -6,8 +6,7 @@ from mathutils import Euler
 
 import props
 import textures as tx
-from lib import box, cable, collection, image, mat, screen_mat, screen_plane
-from stage import wood_floor
+from lib import box, cable, image, mat, screen_mat, screen_plane, tex_mat
 
 R = math.radians
 X0, X1, Y0, Y1 = -1.7, 1.7, -1.4, 1.4
@@ -27,7 +26,13 @@ def shell(m, night, col):
     slab = mat("slab", (0.24, 0.22, 0.21), rough=0.8)
     # 미니어처 받침과 나무 바닥
     box("slab", (X1 - X0 + 0.17, Y1 - Y0 + 0.17, 0.16), ((X0 + X1) / 2 - 0.06, (Y0 + Y1) / 2 + 0.06, -0.10), slab, bevel=0.015, col=col)
-    box("floor", (X1 - X0 + 0.05, Y1 - Y0 + 0.05, 0.02), ((X0 + X1) / 2 + 0.025, (Y0 + Y1) / 2 - 0.025, -0.01), wood_floor(), bevel=0.004, col=col)
+    # 나무 바닥: 웹에서도 같은 그림이 나오도록 절차 텍스처 대신 이미지 + UV 평면을 쓴다
+    fw_, fd_ = X1 - X0 + 0.05, Y1 - Y0 + 0.05
+    fc = ((X0 + X1) / 2 + 0.025, (Y0 + Y1) / 2 - 0.025)
+    box("floor", (fw_, fd_, 0.02), (*fc, -0.011), mat("floor_edge", (0.45, 0.29, 0.16), rough=0.6), bevel=0.004, col=col)
+    px = tx.wood_planks(fw_, fd_)
+    planks = image("tex_floor", px.shape[1], px.shape[0], px)
+    screen_plane("floor_top", fw_, fd_, (*fc, 0.0), tex_mat("floor_wood", planks, rough=0.55, coat=0.1), rot=(R(-90), 0, 0), col=col)
     # 뒤 벽(창 구멍을 남기고 네 조각)
     wy = Y1 + WALL_T / 2
     wx0, wx1, wz0, wz1 = WIN
@@ -68,7 +73,7 @@ def layout(m, night, col, rack_root, cable_mats):
     props.tablet(m, "screen_sentry", (0.98, Y1 - 0.24, 0.52), -12, col, image("tex_issues", 300, 200, tx.issues()), "SENTRY")
     props.plant(m, "plant_cabinet", (1.46, Y1 - 0.22, 0.52), col, height=0.2, pot=3, seed=8)
     props.table_lamp(m, "table_lamp", (0.80, Y1 - 0.20, 0.52), col)
-    props.sconce(m, "sconce", (-0.13, Y1, 1.72), 0, col)
+    props.sconce(m, "sconce", (-0.13, Y1 - 0.021, 1.72), 0, col)
     props.cable_tray(m, "tray", X0 + 0.05, 0.42, Y1 - 0.12, 2.06, col, cable_mats)
     for k in range(4):
         dx = -0.04 + k * 0.025
@@ -81,7 +86,7 @@ def layout(m, night, col, rack_root, cable_mats):
     props.chair(m, "chair", (-0.80, 0.02, 0), -78, col)
     props.wall_shelf(m, "shelf_low", (X0 + 0.12, 0.10, 1.38), 90, col, length=1.15, seed=2)
     props.wall_shelf(m, "shelf_high", (X0 + 0.12, 0.30, 1.76), 90, col, length=0.80, seed=6, decor=False)
-    props.wall_sign(m, "sign", (X0 + 0.0, -0.92, 1.80), 90, col, "HOME LAB", "build · monitor · enjoy")
+    props.wall_sign(m, "sign", (X0 + 0.031, -0.92, 1.80), 90, col, "HOME LAB", "build · monitor · enjoy")
     props.floor_lamp(m, "floor_lamp", (-1.36, -1.08, 0), col)
     # 가운데·앞: 러그, 안락의자, 협탁, 고양이, 화분
     props.rug(m, "rug", (0.15, -0.42, 0), col)

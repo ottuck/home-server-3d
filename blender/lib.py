@@ -176,6 +176,20 @@ def image(name, w, h, pixels):
     return img
 
 
+def tex_mat(name, img, rough=0.5, coat=0.0):
+    """이미지를 바탕색으로 쓰는 일반 재질(GLB로 그대로 나간다)."""
+    m = node_mat(name)
+    nt = m.node_tree
+    bsdf = nt.nodes["Principled BSDF"]
+    tex = nt.nodes.new("ShaderNodeTexImage")
+    tex.image = img
+    nt.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
+    bsdf.inputs["Roughness"].default_value = rough
+    if coat:
+        bsdf.inputs["Coat Weight"].default_value = coat
+    return m
+
+
 def screen_mat(name, img, strength=1.0):
     """빛을 내는 화면 재질(조명 영향 없이 그림이 그대로 보인다)."""
     m = node_mat(name)

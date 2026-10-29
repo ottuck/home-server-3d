@@ -109,6 +109,87 @@ def cyl(name, radius, depth, loc, material, axis="Z", segments=20, bevel=0.0, pa
     return ob
 
 
+def cone(name, r_bottom, r_top, depth, loc, material, segments=24, bevel=0.0, parent=None, col=None):
+    """밑면이 z=0인 원뿔대(화분·전등갓·다리)."""
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=segments, radius1=r_bottom, radius2=r_top, depth=depth)
+    bmesh.ops.translate(bm, verts=bm.verts, vec=(0, 0, depth / 2))
+    bm.to_mesh(me)
+    bm.free()
+    ob = bpy.data.objects.new(name, me)
+    ob.location = loc
+    ob = _finish(ob, material, bevel, 2, parent, col)
+    if bevel <= 0:
+        for p in ob.data.polygons:
+            p.use_smooth = len(p.vertices) == 4
+    return ob
+
+
+def sphere(name, radius, loc, material, scale=(1, 1, 1), segments=24, parent=None, col=None):
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    bmesh.ops.create_uvsphere(bm, u_segments=segments, v_segments=segments // 2, radius=radius)
+    bm.to_mesh(me)
+    bm.free()
+    for p in me.polygons:
+        p.use_smooth = True
+    ob = bpy.data.objects.new(name, me)
+    ob.location = loc
+    ob.scale = scale
+    return _finish(ob, material, 0.0, 0, parent, col)
+
+
+def mesh(name, verts, faces, loc, material, smooth=True, parent=None, col=None, rot=None):
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(verts, [], faces)
+    me.update()
+    for p in me.polygons:
+        p.use_smooth = smooth
+    ob = bpy.data.objects.new(name, me)
+    ob.location = loc
+    if rot:
+        ob.rotation_euler = rot
+    return _finish(ob, material, 0.0, 0, parent, col)
+
+
+def screen_plane(name, w, h, loc, material, rot=None, parent=None, col=None):
+    """-Y를 보는 UV 있는 사각형(화면·창밖 풍경)."""
+    me = bpy.data.meshes.new(name)
+    me.from_pydata([(-w / 2, 0, -h / 2), (w / 2, 0, -h / 2), (w / 2, 0, h / 2), (-w / 2, 0, h / 2)], [], [(0, 1, 2, 3)])
+    uv = me.uv_layers.new(name="UVMap")
+    for li, co in zip(range(4), [(0, 0), (1, 0), (1, 1), (0, 1)]):
+        uv.data[li].uv = co
+    me.update()
+    ob = bpy.data.objects.new(name, me)
+    ob.location = loc
+    if rot:
+        ob.rotation_euler = rot
+    return _finish(ob, material, 0.0, 0, parent, col)
+
+
+def image(name, w, h, pixels):
+    """numpy RGBA(0..1, 아래쪽 행부터) 배열로 이미지를 만들어 .blend에 넣는다."""
+    img = bpy.data.images.new(name, w, h, alpha=False)
+    img.pixels.foreach_set(pixels.astype("float32").ravel())
+    img.pack()
+    return img
+
+
+def screen_mat(name, img, strength=1.0):
+    """빛을 내는 화면 재질(조명 영향 없이 그림이 그대로 보인다)."""
+    m = node_mat(name)
+    nt = m.node_tree
+    bsdf = nt.nodes["Principled BSDF"]
+    tex = nt.nodes.new("ShaderNodeTexImage")
+    tex.image = img
+    nt.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
+    nt.links.new(tex.outputs["Color"], bsdf.inputs["Emission Color"])
+    bsdf.inputs["Emission Strength"].default_value = strength
+    bsdf.inputs["Roughness"].default_value = 0.25
+    return m
+
+
 def cable(name, points, radius, material, parent=None, col=None):
     cu = bpy.data.curves.new(name, "CURVE")
     cu.dimensions = "3D"

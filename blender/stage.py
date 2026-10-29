@@ -110,11 +110,11 @@ def camera(target=(0.0, 0.0, 0.72), ortho_scale=2.1, tilt=58, yaw=34):
     bpy.context.scene.camera = ob
 
 
-def render_settings(res, samples):
+def render_settings(res, samples, res_y=None):
     sc = bpy.context.scene
     sc.render.engine = "CYCLES"
     sc.render.resolution_x = res
-    sc.render.resolution_y = res
+    sc.render.resolution_y = res_y or res
     sc.cycles.samples = samples
     sc.cycles.use_denoising = True
     sc.cycles.max_bounces = 6

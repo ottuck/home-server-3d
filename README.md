@@ -2,7 +2,11 @@
 
 AWS Lightsail 서버 한 대를 작은 3D 서버실로 꾸민 웹 페이지입니다. 방 안 랙에 꽂힌 장비의 LED가 실제 컨테이너 상태에 따라 켜지기 때문에, 서버가 지금 어떤지 한눈에 볼 수 있습니다.
 
-**[라이브 페이지 보기 →](https://server.portfolio-hub.dev)**
+<p align="center">
+  <a href="https://server.portfolio-hub.dev"><img src="https://img.shields.io/badge/%EB%9D%BC%EC%9D%B4%EB%B8%8C_%ED%8E%98%EC%9D%B4%EC%A7%80_%EB%B3%B4%EA%B8%B0-server.portfolio--hub.dev-2f9e6e?style=for-the-badge" alt="라이브 페이지 보기: server.portfolio-hub.dev" height="36"></a>
+  <br>
+  <sub>실제 서버 상태가 1분 단위로 반영됩니다. 주소 뒤에 <code>?demo=1</code>을 붙이면 예시 데이터로 볼 수 있습니다.</sub>
+</p>
 
 | 낮 | 밤 |
 | --- | --- |

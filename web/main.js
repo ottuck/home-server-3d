@@ -232,7 +232,16 @@ function applyTheme(name) {
   }
   [bloom.strength, bloom.radius, bloom.threshold] = t.bloom;
 }
-document.getElementById("theme").onclick = () => applyTheme(theme === "day" ? "night" : "day");
+// 방문자 현지 시각으로 낮(06~18시)·밤을 고르고 1분마다 다시 본다. 버튼을 누르면 그 뒤로는 자동 전환을 멈춘다.
+let autoTheme = true;
+const clockTheme = () => {
+  const h = new Date().getHours();
+  return h >= 6 && h < 18 ? "day" : "night";
+};
+document.getElementById("theme").onclick = () => {
+  autoTheme = false;
+  applyTheme(theme === "day" ? "night" : "day");
+};
 
 // ---------------------------------------------------------------- 오른쪽 패널
 
@@ -502,7 +511,10 @@ const [gltf, nightSky] = await Promise.all([
   new THREE.TextureLoader().loadAsync("data/textures/skyline_night.png"),
 ]);
 setupScene(gltf, nightSky);
-applyTheme(matchMedia("(prefers-color-scheme: dark)").matches ? "night" : "day");
+applyTheme(clockTheme());
+setInterval(() => {
+  if (autoTheme && clockTheme() !== theme) applyTheme(clockTheme());
+}, 60_000);
 renderPanel();
 await refresh();
 setInterval(refresh, REFRESH_MS);

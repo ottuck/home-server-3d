@@ -1,0 +1,95 @@
+{
+  "title": "Home Server 3D",
+  "width": 1140,
+  "height": 400,
+  "summary": "방문자가 Cloudflare Pages의 3D 웹을 열면, 상태 API가 Grafana Cloud에서 Lightsail 서버의 지표를 읽어 공개용 상태로 요약해 돌려줍니다. 3D 장면은 개발 PC의 Blender에서 만들어 git push로 배포합니다.",
+  "groups": [
+    {
+      "title": "Cloudflare Pages",
+      "x": 310,
+      "y": 50,
+      "w": 230,
+      "h": 320
+    }
+  ],
+  "nodes": [
+    {
+      "id": "visitor",
+      "x": 100,
+      "y": 150,
+      "title": "방문자",
+      "note": "브라우저",
+      "tone": "accent"
+    },
+    {
+      "id": "web",
+      "x": 425,
+      "y": 150,
+      "title": "3D 웹 뷰어",
+      "note": "three.js · GLB"
+    },
+    {
+      "id": "api",
+      "x": 425,
+      "y": 300,
+      "title": "상태 API",
+      "note": "Pages Functions"
+    },
+    {
+      "id": "grafana",
+      "x": 750,
+      "y": 300,
+      "title": "Grafana Cloud",
+      "note": "Prometheus",
+      "tone": "outside"
+    },
+    {
+      "id": "server",
+      "x": 1035,
+      "y": 300,
+      "title": "AWS Lightsail",
+      "note": "컨테이너 13개 · Alloy"
+    },
+    {
+      "id": "dev",
+      "x": 100,
+      "y": 300,
+      "title": "개발 PC",
+      "note": "Blender · Git",
+      "tone": "accent"
+    }
+  ],
+  "edges": [
+    {
+      "from": "visitor",
+      "to": "web",
+      "offset": -12
+    },
+    {
+      "from": "web",
+      "to": "api",
+      "label": "상태 조회"
+    },
+    {
+      "from": "api",
+      "to": "grafana",
+      "label": "PromQL",
+      "both": true
+    },
+    {
+      "from": "server",
+      "to": "grafana",
+      "label": "지표 전송"
+    },
+    {
+      "from": "dev",
+      "to": "web",
+      "label": "git push",
+      "dashed": true,
+      "route": "hvh",
+      "bend": 245,
+      "toOffset": 14,
+      "labelAt": 1
+    }
+  ]
+}

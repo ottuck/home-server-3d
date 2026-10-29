@@ -1,0 +1,4 @@
+# Cloudflare Pages 응답 헤더. portfolio-hub.dev 존의 브라우저 캐시(4시간)가 JS에 붙어
+# 배포 뒤에도 예전 코드가 돌던 문제를 막는다. 매번 ETag로 확인하고 바뀌었을 때만 받는다.
+/*
+  Cache-Control: no-cache

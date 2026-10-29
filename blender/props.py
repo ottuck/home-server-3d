@@ -256,7 +256,7 @@ def table_lamp(m, name, loc, col):
     root = _root(name, loc, 0, col)
     sphere(f"{name}_base", 0.07, (0, 0, 0.065), m.pots[0], scale=(1, 1, 0.95), segments=32, parent=root, col=col)
     cyl(f"{name}_neck", 0.008, 0.08, (0, 0, 0.16), m.brass, segments=12, parent=root, col=col)
-    cone(f"{name}_shade", 0.11, 0.07, 0.12, (0, 0, 0.18), m.shade, segments=40, parent=root, col=col)
+    cone(f"{name}_shade", 0.11, 0.07, 0.12, (0, 0, 0.18), m.shade, segments=40, parent=root, col=col, caps=False)
     sphere(f"{name}_bulb", 0.025, (0, 0, 0.22), m.bulb, parent=root, col=col)
     return root
 
@@ -265,7 +265,7 @@ def floor_lamp(m, name, loc, col):
     root = _root(name, loc, 0, col)
     cyl(f"{name}_base", 0.14, 0.025, (0, 0, 0.0125), m.black_metal, segments=40, bevel=0.008, parent=root, col=col)
     cyl(f"{name}_pole", 0.012, 1.38, (0, 0, 0.71), m.brass, segments=16, parent=root, col=col)
-    cone(f"{name}_shade", 0.22, 0.16, 0.28, (0, 0, 1.30), m.shade, segments=48, parent=root, col=col)
+    cone(f"{name}_shade", 0.22, 0.16, 0.28, (0, 0, 1.30), m.shade, segments=48, parent=root, col=col, caps=False)
     sphere(f"{name}_bulb", 0.04, (0, 0, 1.38), m.bulb, parent=root, col=col)
     return root
 
@@ -322,7 +322,7 @@ def wall_sign(m, name, loc, rotz, col, title, subtitle):
 def sconce(m, name, loc, rotz, col):
     root = _root(name, loc, rotz, col)
     box(f"{name}_plate", (0.08, 0.02, 0.14), (0, 0.01, 0), m.brass, bevel=0.008, parent=root, col=col)
-    cone(f"{name}_shade", 0.06, 0.075, 0.10, (0, -0.07, -0.02), m.shade, segments=32, parent=root, col=col)
+    cone(f"{name}_shade", 0.06, 0.075, 0.10, (0, -0.07, -0.02), m.shade, segments=32, parent=root, col=col, caps=False)
     sphere(f"{name}_bulb", 0.025, (0, -0.07, 0.02), m.bulb, parent=root, col=col)
     return root
 

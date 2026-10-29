@@ -109,11 +109,11 @@ def cyl(name, radius, depth, loc, material, axis="Z", segments=20, bevel=0.0, pa
     return ob
 
 
-def cone(name, r_bottom, r_top, depth, loc, material, segments=24, bevel=0.0, parent=None, col=None):
-    """밑면이 z=0인 원뿔대(화분·전등갓·다리)."""
+def cone(name, r_bottom, r_top, depth, loc, material, segments=24, bevel=0.0, parent=None, col=None, caps=True):
+    """밑면이 z=0인 원뿔대(화분·전등갓·다리). caps=False면 위아래가 뚫린 통(전등갓)."""
     me = bpy.data.meshes.new(name)
     bm = bmesh.new()
-    bmesh.ops.create_cone(bm, cap_ends=True, segments=segments, radius1=r_bottom, radius2=r_top, depth=depth)
+    bmesh.ops.create_cone(bm, cap_ends=caps, segments=segments, radius1=r_bottom, radius2=r_top, depth=depth)
     bmesh.ops.translate(bm, verts=bm.verts, vec=(0, 0, depth / 2))
     bm.to_mesh(me)
     bm.free()

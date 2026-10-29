@@ -1,9 +1,9 @@
 {
-  "$comment": "3D 장면과 웹이 함께 읽는 장비 목록. containers는 cAdvisor container 라벨 값(2026-10-29 Grafana Cloud 실측). decor는 실제 장비가 아닌 장식.",
+  "$comment": "3D 장면과 웹이 함께 읽는 장비 목록. containers는 cAdvisor container 라벨 값(2026-10-29 Grafana Cloud 실측). decor는 실제 장비가 아닌 장식. 화면에는 title·subtitle만 보이고 id(실제 호스트 이름)는 드러내지 않는다.",
   "host": {
     "id": "quant-lab-02",
-    "title": "quant-lab-02",
-    "subtitle": "AWS Lightsail · 2 GB",
+    "title": "AWS Lightsail",
+    "subtitle": "Home Server · 2 GB",
     "rackUnits": 22
   },
   "units": [

@@ -33,7 +33,7 @@ const THEMES = {
   },
   night: {
     bg: 0x1a2340, hemi: 0.10, sun: 0, env: 0.05, window: 0.6, lamps: 1, rack: 1.2,
-    shade: 0.55, bulb: 2.2, sign: 2.2, screen: 1.0, led: 14, bloom: [0.45, 0.3, 1.0],
+    shade: 0.75, bulb: 2.2, sign: 2.2, screen: 1.0, led: 14, bloom: [0.45, 0.3, 1.0],
   },
 };
 
@@ -93,7 +93,7 @@ windowLight.target.position.copy(B(-0.4, -0.3, 0.2));
 // 밤 조명: 스탠드, 책상 등, 탁상등, 벽등(room.py 위치와 같다)
 const warm = 0xffb873;
 const lamps = [
-  [B(-1.36, -1.08, 1.40), 2.2, 4.5, true],
+  [B(-1.36, -1.08, 1.42), 3.6, 6.5, true], // 스탠드: 방 전체를 밝히는 주 조명
   [B(-1.25, 0.66, 1.08), 0.7, 2.5, false],
   [B(0.80, 1.20, 0.76), 0.9, 3.0, false],
   [B(-0.13, 1.31, 1.74), 0.9, 3.0, false],
@@ -154,12 +154,15 @@ function setupScene(gltf, nightSky) {
   root.traverse((o) => {
     if (o.isMesh) {
       const glow = o.name.endsWith("_screen") || o.name === "skyline";
-      o.castShadow = !glow;
+      // 조명 기구는 자기 빛을 가리지 않도록 그림자를 만들지 않는다
+      const fixture = ["prop__floor_lamp", "prop__table_lamp", "prop__sconce"].includes(o.name);
+      o.castShadow = !glow && !fixture;
       o.receiveShadow = !glow;
       for (const m of [o.material].flat()) {
         mats.set(m.name, m);
-        // Blender 코트는 glTF에서 거울처럼 매끈해져 점 조명이 바닥에 점으로 맺힌다
-        if (m.clearcoat) m.clearcoatRoughness = Math.max(m.clearcoatRoughness, 0.4);
+        // Blender 코트는 glTF에서 거울처럼 매끈해져 점 조명이 바닥에 점으로 맺힌다.
+        // 바닥은 은은한 광택을 남기고(Cycles 렌더의 느낌), 나머지는 더 거칠게 한다.
+        if (m.clearcoat) m.clearcoatRoughness = Math.max(m.clearcoatRoughness, m.name === "floor_wood" ? 0.22 : 0.4);
       }
       if (o.name.endsWith("_screen")) screens.push(o.material);
       if (o.name === "skyline") {
@@ -298,7 +301,7 @@ renderer.setAnimationLoop(() => {
   composer.render();
 });
 
-infra = await (await fetch("data/infra.json")).json();
+infra = await (await fetch("data/infra.json", { cache: "no-cache" })).json();
 document.getElementById("title").textContent = infra.host.title;
 document.getElementById("subtitle").textContent = infra.host.subtitle;
 // Blender 내보내기는 Draco로 압축한다(blender/export.py).

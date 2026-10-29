@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>quant-lab-02 · Server Room</title>
+  <style>
+    :root { --ink: #2b2723; --sub: #7a7168; --card: rgba(255, 252, 247, 0.82); --bg: #efe9e1; }
+    body.night { --ink: #ece6dd; --sub: #a49a8e; --card: rgba(24, 24, 30, 0.72); --bg: #15151b; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink);
+      font: 14px/1.4 system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif; }
+    canvas { display: block; touch-action: none; }
+    .hud { position: fixed; left: 16px; top: 16px; padding: 12px 14px; border-radius: 12px;
+      background: var(--card); backdrop-filter: blur(8px); box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+    .hud h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: .01em; }
+    .hud .sub { color: var(--sub); font-size: 12px; }
+    .legend { display: flex; gap: 10px; margin-top: 8px; font-size: 12px; color: var(--sub); flex-wrap: wrap; }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: 1px; }
+    .ok { background: #4cd97a; } .warn { background: #ff9f2e; } .error { background: #ff3b2f; } .unknown { background: #8a8d91; }
+    .toggle { position: fixed; right: 16px; top: 16px; border: 0; border-radius: 999px; padding: 8px 14px;
+      background: var(--card); color: var(--ink); font: inherit; cursor: pointer; backdrop-filter: blur(8px);
+      box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+    .tip { position: fixed; pointer-events: none; padding: 8px 10px; border-radius: 10px; background: var(--card);
+      backdrop-filter: blur(8px); font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); display: none; min-width: 160px; }
+    .tip b { display: block; font-size: 13px; margin-bottom: 4px; }
+    .tip .row { white-space: nowrap; }
+    .tip .muted { color: var(--sub); }
+  </style>
+  <script type="importmap">
+    { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    } }
+  </script>
+</head>
+<body>
+  <div class="hud">
+    <h1 id="title">quant-lab-02</h1>
+    <div class="sub" id="subtitle"></div>
+    <div class="legend">
+      <span><i class="dot ok"></i>정상</span>
+      <span><i class="dot warn"></i>주의</span>
+      <span><i class="dot error"></i>오류</span>
+      <span><i class="dot unknown"></i>데이터 없음</span>
+    </div>
+    <div class="sub" id="updated" style="margin-top:6px"></div>
+  </div>
+  <button class="toggle" id="theme">밤</button>
+  <div class="tip" id="tip"></div>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

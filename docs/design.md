@@ -30,7 +30,7 @@
   - `export.py`: GLB 최적화
 - 좌표: 정면 -Y, 위 +Z, 미터 단위. 1U = 44.5mm, 전면판 19인치, 랙 외곽 0.66 × 0.66m, 22U.
 - GLB 노드 이름 규칙(웹이 이 이름으로 찾는다):
-  - `unit__<id>`: 장비 단위(extras에 `kind`, `decor`). 몸체는 `unit__<id>_body`
+  - `unit__<id>`: 장비 단위(extras에 `kind`, `decor`). 몸체는 `<id>_body`(접두사 없음)
   - `led__<container>`: 컨테이너 상태 LED
   - `*_screen`: 화면. 웹이 실시간 그림으로 바꿔 끼운다
   - `skyline`: 창밖 풍경. 밤 그림은 `assets/textures/skyline_night.png`
@@ -48,5 +48,5 @@ Cloudflare Pages(정적 웹)와 Cloudflare Worker를 쓴다. Worker가 읽기 �
 
 ## 남은 일
 
-- 웹 뷰어(React + R3F): `scene.glb`를 불러 고정 아이소메트릭 카메라, 장비 선택, 낮/밤 전환을 만든다.
+- 웹 뷰어(`web/`, three.js, `node web/sync.mjs`로 데이터 복사)는 지금 `rack.glb`만 보여 준다. 다음으로 `scene.glb`를 불러 고정 아이소메트릭 카메라와 낮/밤 전환(창밖 그림 교체 포함)을 붙인다.
 - 웹에서 Cycles 분위기를 내려면 조명을 Blender에서 굽는다(bake, 낮/밤 두 벌). 먼저 실시간 조명 + 블룸으로 시작하고 차이를 보고 정한다.

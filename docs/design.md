@@ -94,6 +94,15 @@ Cloudflare Pages 하나로 정적 웹과 `GET /api/status`를 함께 낸다. Lig
 - 호스트 %: CPU는 5분 평균 `1 - idle`, 메모리는 `1 - MemAvailable/MemTotal`, 디스크는 `/` 기준. 소수 1자리.
 - 웹(`web/status.js`)은 `?demo=1`이거나 localhost에서 API가 없으면 예시 데이터(`demo: true`)를 쓴다.
 
+### 벽 모니터 (`functions/api/history.js`, `web/monitor.js`)
+
+- `GET /api/history`: 최근 1시간 호스트 지표를 1분 간격 61칸으로 돌려준다(`query_range`, 쿼리 하나). 서버 전체 합계만 싣는다.
+  - `cpu`, `mem`, `disk`는 %, `netIn`, `netOut`은 바이트/초(인터페이스는 `lo`, `tailscale*`, `veth*`, `docker*`, `br-*` 제외). 빈 칸은 `null`.
+  - 캐시와 실패 처리는 상태 API와 같다(공통 코드 `functions/_lib/prom.js`).
+- 웹은 GLB의 `screen_grafana_screen` 그림을 1280×720 캔버스로 바꿔 1분마다 다시 그린다. 칸 순서와 색은 Blender 장식 화면과 같다(CPU 초록, 메모리 주황, 네트워크 파랑, 디스크 보라).
+- 모니터나 패널의 "Grafana Cloud" 칩을 누르면 회전 한계 안에서 가장 정면에 가까운 각도로 다가가고, 패널에 큰 차트(SVG)를 연다.
+- 세로축은 %면 10 단위(10~100), 네트워크면 1·2·5 단위로 최대값의 1.25배까지 올린다.
+
 ## 남은 일
 
 - 웹 조명이 Cycles와 차이가 크면 SSAO나 조명 굽기(낮/밤 두 벌)를 검토한다.

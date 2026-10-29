@@ -8,9 +8,11 @@ import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js"
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
-import { STATUS_COLOR, fetchStatus, containerStatus, unitStatus } from "./status.js";
+import { STATUS_COLOR, fetchStatus, fetchHistory, containerStatus, unitStatus } from "./status.js";
+import { drawMonitor, chartsHTML } from "./monitor.js";
 
 const REFRESH_MS = 5000;
+const HISTORY_MS = 60_000; // 벽 모니터 기록(API가 1분 캐시)
 const STATUS_LABEL = { ok: "정상", warn: "주의", error: "오류", unknown: "데이터 없음" };
 const RANK = { ok: 0, unknown: 1, warn: 2, error: 3 };
 
@@ -22,6 +24,8 @@ const TARGET = B(0, 0.1, 1.08);
 const TILT = THREE.MathUtils.degToRad(58);
 const YAW = THREE.MathUtils.degToRad(40);
 const VIEW_DIR = new THREE.Vector3(Math.sin(TILT) * Math.sin(YAW), Math.cos(TILT), Math.sin(TILT) * Math.cos(YAW));
+// 벽 모니터를 볼 때는 회전 한계 안에서 화면을 가장 정면에 가깝게 본다
+const MONITOR_DIR = new THREE.Vector3().setFromSphericalCoords(1, TILT - THREE.MathUtils.degToRad(13), YAW - THREE.MathUtils.degToRad(24));
 const VIEW_HALF_W = 6.5 / 2;
 const VIEW_HALF_H = 4.06 / 2;
 // 방 바닥 범위(팬 제한): Blender x[-1.7,1.7], y[-1.4,1.4]
@@ -147,6 +151,8 @@ const units = new Map(); // unit id -> { object, info, tag }
 const mats = new Map(); // 재질 이름 -> 재질(GLB 안에서 공유)
 const screens = []; // 화면 재질(*_screen)
 let skyline = null; // { material, day, night }
+let monitor = null; // 벽 모니터 { screen, parts, canvas, texture }
+let history = null;
 let rack = null;
 let infra = null;
 let status = null;
@@ -168,6 +174,7 @@ function setupScene(gltf, nightSky) {
         if (m.clearcoat) m.clearcoatRoughness = Math.max(m.clearcoatRoughness, m.name === "floor_wood" ? 0.22 : 0.4);
       }
       if (o.name.endsWith("_screen")) screens.push(o.material);
+      if (o.name === "screen_grafana_screen") setupMonitor(o);
       if (o.name === "skyline") {
         nightSky.flipY = false;
         nightSky.colorSpace = THREE.SRGBColorSpace;
@@ -189,9 +196,31 @@ function setupScene(gltf, nightSky) {
       units.set(id, { object: o, info: infra.units.find((u) => u.id === id) ?? { id, ...o.userData } });
     }
   });
+  if (monitor) monitor.parts.push(root.getObjectByName("prop__screen_grafana") ?? monitor.screen);
   scene.add(root);
   root.updateMatrixWorld(true); // 첫 렌더 전에 장비 위치(이름표 기준점)를 계산하려면 필요하다
   makeTags();
+}
+
+// 벽 모니터의 장식 그림을 실제 그래프 캔버스로 바꾼다(glTF UV에 맞춰 flipY 끔).
+function setupMonitor(screen) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1280;
+  canvas.height = 720;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.flipY = false;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  screen.material.map = screen.material.emissiveMap = texture;
+  screen.material.needsUpdate = true;
+  monitor = { screen, parts: [screen], canvas, texture };
+  paintMonitor();
+}
+
+function paintMonitor() {
+  if (!monitor) return;
+  drawMonitor(monitor.canvas, history);
+  monitor.texture.needsUpdate = true;
 }
 
 // ---------------------------------------------------------------- 테마
@@ -257,6 +286,12 @@ function renderPanel() {
   $("overall").innerHTML = `<i class="dot ${overall}"></i><b>${STATUS_LABEL[overall]}</b> · ${source} · ${when}`;
 
   const host = status?.host ?? {};
+  $("charts").hidden = !monitorFocused;
+  if (monitorFocused) {
+    $("charts-src").textContent = !history?.start ? "" : history.demo ? "예시 데이터" : "1분 간격";
+    $("chart-list").innerHTML = chartsHTML(history);
+  }
+
   $("metrics").innerHTML = [["CPU", host.cpu], ["메모리", host.mem], ["디스크", host.disk]].map(([k, v]) => {
     const ok = Number.isFinite(v);
     return `<div class="metric"><div class="k">${k}</div><div class="v">${ok ? Math.round(v) + "%" : "—"}</div>` +
@@ -282,6 +317,7 @@ function renderPanel() {
     u.tag.classList.toggle("sel", id === selected);
   }
 }
+$("ext-grafana").onclick = () => focusMonitor();
 $("services").addEventListener("click", (e) => {
   const li = e.target.closest(".svc");
   if (li) select(li.dataset.id === selected ? null : li.dataset.id, true);
@@ -289,16 +325,17 @@ $("services").addEventListener("click", (e) => {
 
 // ---------------------------------------------------------------- 랙 확대·선택
 
-let focused = false;
+let focused = false; // 랙 확대
+let monitorFocused = false; // 벽 모니터 확대
 let selected = null;
 let anim = null;
 const clock = new THREE.Clock();
 
-function flyTo(target, zoom) {
+function flyTo(target, zoom, dir = VIEW_DIR) {
   anim = {
     t0: clock.getElapsedTime(),
     from: { target: controls.target.clone(), position: camera.position.clone(), zoom: camera.zoom },
-    to: { target, position: target.clone().addScaledVector(VIEW_DIR, 12), zoom },
+    to: { target, position: target.clone().addScaledVector(dir, 12), zoom },
   };
 }
 
@@ -321,12 +358,27 @@ function focusRack() {
   // 랙과 오른쪽 이름표가 함께 보이도록 목표점을 랙 오른쪽으로 조금 옮긴다
   flyTo(c.add(new THREE.Vector3(0.18, -0.02, 0.1)), THREE.MathUtils.clamp((2 * halfH) / (h * 1.25), 1, 5));
   focused = true;
+  monitorFocused = false;
   $("back").classList.add("show");
+}
+
+function focusMonitor() {
+  if (!monitor) return;
+  const box = new THREE.Box3().setFromObject(monitor.screen);
+  const w = Math.hypot(box.max.x - box.min.x, box.max.z - box.min.z);
+  // 화면 폭이 보이는 폭의 약 80%가 되게 맞춘다
+  flyTo(box.getCenter(new THREE.Vector3()), THREE.MathUtils.clamp((2 * camera.right) / (w * 1.25), 1, 5), MONITOR_DIR);
+  focused = false;
+  monitorFocused = true;
+  select(null);
+  $("back").classList.add("show");
+  $("panel").scrollTop = 0;
 }
 
 function home() {
   flyTo(TARGET.clone(), 1);
   focused = false;
+  monitorFocused = false;
   select(null);
   $("back").classList.remove("show");
 }
@@ -402,7 +454,7 @@ function placeTags() {
 }
 
 $("back").onclick = home;
-addEventListener("keydown", (e) => e.key === "Escape" && focused && home());
+addEventListener("keydown", (e) => e.key === "Escape" && (focused || monitorFocused) && home());
 
 // ---------------------------------------------------------------- 상태
 
@@ -414,6 +466,12 @@ function paintLeds() {
   const unseen = infra.units.flatMap((u) => (u.containers ?? []).map((c) => c.id)).filter((id) => !leds.has(id));
   if (unseen.length) console.warn("GLB에 LED가 없는 컨테이너:", unseen);
   renderPanel();
+}
+
+async function refreshHistory() {
+  history = await fetchHistory();
+  paintMonitor();
+  if (monitorFocused) renderPanel();
 }
 
 async function refresh() {
@@ -448,11 +506,20 @@ function unitOf(obj) {
 }
 
 const inRack = (obj) => { for (let o = obj; o; o = o.parent) if (o === rack) return true; return false; };
+const pickables = () => [rack, ...(monitor?.parts ?? [])].filter(Boolean);
+const onMonitor = (hit) => !!hit && !inRack(hit.object);
 
 renderer.domElement.addEventListener("pointermove", (e) => {
   if (!infra || !rack || e.buttons) return (tip.style.display = "none");
-  const hit = pick(e, [rack]);
+  const hit = pick(e, pickables());
   renderer.domElement.style.cursor = hit ? "pointer" : "";
+  if (onMonitor(hit)) {
+    tip.innerHTML = "<b>Grafana Cloud</b><div class=\"row muted\">최근 1시간 서버 지표 · 눌러서 크게 보기</div>";
+    tip.style.display = "block";
+    tip.style.left = `${Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8)}px`;
+    tip.style.top = `${Math.min(e.clientY + 14, innerHeight - tip.offsetHeight - 8)}px`;
+    return;
+  }
   const unit = hit && unitOf(hit.object);
   if (!unit || unit.info.decor || !unit.info.containers?.length) return (tip.style.display = "none");
   const { info } = unit;
@@ -473,12 +540,14 @@ let down = null;
 renderer.domElement.addEventListener("pointerdown", (e) => (down = [e.clientX, e.clientY]));
 renderer.domElement.addEventListener("pointerup", (e) => {
   if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 6 || !rack) return;
-  const hit = pick(e, [rack]);
-  if (hit) {
+  const hit = pick(e, pickables());
+  if (onMonitor(hit)) {
+    if (!monitorFocused) focusMonitor();
+  } else if (hit) {
     const unit = unitOf(hit.object);
     if (!focused) focusRack();
     select(unit && !unit.info.decor && unit.info.containers?.length ? unit.info.id : null);
-  } else if (focused) {
+  } else if (focused || monitorFocused) {
     home();
   }
 });
@@ -516,5 +585,7 @@ setInterval(() => {
   if (autoTheme && clockTheme() !== theme) applyTheme(clockTheme());
 }, 60_000);
 renderPanel();
+refreshHistory();
+setInterval(refreshHistory, HISTORY_MS);
 await refresh();
 setInterval(refresh, REFRESH_MS);

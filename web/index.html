@@ -44,6 +44,14 @@
     .svc .kids span { color: var(--sub); margin-left: auto; }
     .ext { display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--sub); }
     .ext span { border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; }
+    .ext .link { cursor: pointer; color: var(--ink); }
+    .ext .link:hover { background: var(--hover); }
+    .chart { margin-top: 10px; }
+    .chart-h { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; color: var(--sub); }
+    .chart-h b { font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
+    .chart svg { display: block; width: 100%; height: 64px; margin-top: 4px; border-radius: 6px; background: var(--hover); }
+    .chart .grid { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+    .chart-x { display: flex; justify-content: space-between; font-size: 10px; color: var(--sub); margin-top: 2px; }
     .legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; color: var(--sub); margin-top: 16px; }
     .legend span { display: flex; align-items: center; gap: 4px; }
     .note { font-size: 11px; color: var(--sub); margin-top: 10px; }
@@ -93,15 +101,19 @@
       </header>
       <div class="overall" id="overall"></div>
       <div class="metrics" id="metrics"></div>
+      <section id="charts" hidden>
+        <h2>최근 1시간 <span id="charts-src"></span></h2>
+        <div id="chart-list"></div>
+      </section>
       <h2>서비스 <span id="svc-count"></span></h2>
       <ul id="services"></ul>
       <h2>외부 서비스</h2>
-      <div class="ext"><span>Grafana Cloud · 지표</span><span>Sentry · 오류 추적</span></div>
+      <div class="ext"><span class="link" id="ext-grafana">Grafana Cloud · 지표</span><span>Sentry · 오류 추적</span></div>
       <div class="legend">
         <span><i class="dot ok"></i>정상</span><span><i class="dot warn"></i>주의</span>
         <span><i class="dot error"></i>오류</span><span><i class="dot unknown"></i>데이터 없음</span>
       </div>
-      <div class="note">랙을 누르면 가까이서 볼 수 있어요. 랙 하나가 서버 한 대, LED 하나가 컨테이너 하나입니다.</div>
+      <div class="note">랙이나 벽 모니터를 누르면 가까이서 볼 수 있어요. 랙 하나가 서버 한 대, LED 하나가 컨테이너 하나입니다.</div>
     </aside>
   </div>
   <div class="tip" id="tip"></div>

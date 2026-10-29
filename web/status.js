@@ -29,6 +29,33 @@ export async function fetchStatus(infra) {
   }
 }
 
+// 벽 모니터용 최근 1시간 호스트 지표(/api/history, functions/api/history.js).
+// 반환 형태: { updatedAt, start: ISO, step: 초, series: { cpu, mem, disk: [%], netIn, netOut: [바이트/초] } }, 빈 칸은 null.
+// 실패하면 series가 {}다. 가짜 기록에는 demo: true가 붙는다.
+export async function fetchHistory() {
+  if (DEMO) return fakeHistory();
+  try {
+    const res = await fetch("/api/history");
+    if (!res.ok) throw new Error(`history ${res.status}`);
+    const h = await res.json();
+    return { updatedAt: h.updatedAt, start: h.start, step: h.step, series: h.series ?? {} };
+  } catch {
+    if (LOCAL) return fakeHistory();
+    return { updatedAt: new Date().toISOString(), start: null, step: 60, series: {} };
+  }
+}
+
+function fakeHistory() {
+  const n = 61;
+  const wave = (base, amp, f, k = 1) => Array.from({ length: n }, (_, i) =>
+    Math.round((base + amp * Math.sin(i / f) + amp * 0.4 * Math.sin(i / 2.3 + f)) * k) / k);
+  const start = new Date(Math.floor(Date.now() / 60000) * 60000 - (n - 1) * 60000).toISOString();
+  return {
+    updatedAt: new Date().toISOString(), demo: true, start, step: 60,
+    series: { cpu: wave(9, 4, 5, 10), mem: wave(66, 2, 9, 10), disk: wave(23.4, 0.05, 20, 10), netIn: wave(2400, 600, 4), netOut: wave(1900, 500, 6) },
+  };
+}
+
 let tick = 0;
 function fakeStatus(infra) {
   const names = infra.units.flatMap((u) => (u.containers ?? []).map((c) => c.id));

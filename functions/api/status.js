@@ -1,10 +1,10 @@
 // GET /api/status — 공개용 서버 상태. Grafana Cloud Prometheus를 읽기 전용 토큰으로 대신 조회한다.
 // 응답에는 공개 컨테이너 id(infra.json)와 상태, 호스트 % 숫자만 싣는다.
 // cAdvisor 라벨·호스트 이름·IP·쿼리는 절대 내보내지 않는다.
-// 환경 변수: GRAFANA_PROM_URL(…grafana.net/api/prom), GRAFANA_PROM_USER(인스턴스 id), GRAFANA_PROM_TOKEN(metrics:read)
 import infra from "../../shared/infra.json";
+import { CAD, UNIX, cachedJson, prom, round, tag } from "../_lib/prom.js";
 
-const TTL = 60; // 초. 방문자 수와 상관없이 조회는 데이터센터당 1분에 한 번 정도로 묶인다.
+const TTL = 60; // 초. 캐시 기간
 const FAIL_TTL = 10; // 초. 조회 실패 응답은 짧게만 캐시해 곧 다시 시도한다.
 const STALE = 180; // 초. 스크레이프 간격이 60초라 마지막 지표가 3분보다 오래되면 사라진 것으로 본다.
 const RESTART_WINDOW = 600; // 초. 최근 10분 안에 (재)시작했으면 주의.
@@ -15,10 +15,7 @@ const SOURCE_TO_ID = new Map(
   infra.units.flatMap((u) => (u.containers ?? []).map((c) => [c.source, c.id])),
 );
 
-const CAD = 'job="integrations/cadvisor",container!=""';
-const UNIX = 'job="integrations/unix"';
-const tag = (q, expr) => `label_replace(${expr}, "q", "${q}", "", "")`;
-// 한 번의 요청으로 모든 신호를 받는다. 결과 시리즈마다 q 라벨로 신호를 구분한다.
+// 한 번의 요청으로 모든 신호를 받는다.
 const QUERY = [
   tag("seen", `time() - max by (container) (timestamp(container_last_seen{${CAD}}))`),
   tag("uptime", `time() - max by (container) (container_start_time_seconds{${CAD}})`),
@@ -30,39 +27,16 @@ const QUERY = [
   tag("disk", `100 * (1 - max(node_filesystem_avail_bytes{${UNIX},mountpoint="/"}) / max(node_filesystem_size_bytes{${UNIX},mountpoint="/"}))`),
 ].join(" or ");
 
-let memo = null; // { at, ttl, body } — 같은 isolate 안의 요청은 Cache API 없이도 묶는다.
-
-export async function onRequestGet({ request, env, waitUntil }) {
-  if (memo && Date.now() - memo.at < memo.ttl * 1000) return reply(memo.body, memo.ttl);
-
-  const cache = caches.default;
-  const key = new Request(new URL("/api/status", request.url).toString());
-  const hit = await cache.match(key);
-  if (hit) return hit;
-
-  const status = await buildStatus(env);
-  const ttl = Object.keys(status.containers).length ? TTL : FAIL_TTL;
-  const body = JSON.stringify(status);
-  memo = { at: Date.now(), ttl, body };
-  const res = reply(body, ttl);
-  waitUntil(cache.put(key, res.clone()));
-  return res;
-}
-
-function reply(body, ttl) {
-  return new Response(body, {
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": `public, max-age=${ttl}`,
-    },
-  });
-}
+export const onRequestGet = cachedJson("/api/status", async (env) => {
+  const data = await buildStatus(env);
+  return { data, ttl: Object.keys(data.containers).length ? TTL : FAIL_TTL };
+});
 
 async function buildStatus(env) {
   const updatedAt = new Date().toISOString();
   let series;
   try {
-    series = await queryProm(env, QUERY).catch(() => queryProm(env, QUERY)); // 한 번 더 시도
+    series = await prom(env, "query", { query: QUERY });
   } catch (e) {
     console.error("status query failed:", e.message); // Pages 로그에만 남는다.
     // 조회 실패: 모든 컨테이너를 "데이터 없음"으로 둔다.
@@ -102,22 +76,3 @@ function judge(s) {
   if (s.mem >= MEM_WARN) return "warn";
   return "ok";
 }
-
-async function queryProm(env, query) {
-  const url = `${env.GRAFANA_PROM_URL.replace(/\/$/, "")}/api/v1/query`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      authorization: `Basic ${btoa(`${env.GRAFANA_PROM_USER}:${env.GRAFANA_PROM_TOKEN}`)}`,
-      "content-type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({ query }),
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!res.ok) throw new Error(`prom ${res.status}`);
-  const json = await res.json();
-  if (json.status !== "success") throw new Error("prom error");
-  return json.data.result;
-}
-
-const round = (v) => Math.round(v * 10) / 10;

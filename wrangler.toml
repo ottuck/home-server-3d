@@ -1,0 +1,5 @@
+# Cloudflare Pages 설정. 로컬: `npx wrangler pages dev` (저장소 루트, .dev.vars에 GRAFANA_PROM_* 값).
+# 운영 비밀 값은 Pages 프로젝트 환경 변수(Secret)로 넣는다.
+name = "home-server-3d"
+pages_build_output_dir = "web"
+compatibility_date = "2026-10-01"

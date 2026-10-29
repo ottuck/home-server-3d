@@ -56,7 +56,20 @@
 
 ## 데이터 경로 (Phase 4)
 
-Cloudflare Pages(정적 웹)와 Cloudflare Worker를 쓴다. Worker가 읽기 전용 Grafana Cloud 토큰으로 정해진 PromQL만 대신 조회한다. 접근은 Cloudflare Access로 막는다. Lightsail 서버에는 아무것도 추가하지 않는다.
+Cloudflare Pages 하나로 정적 웹과 상태 API(Pages Functions `functions/api/status.js`, `GET /api/status`)를 함께 낸다. 공개 페이지다. Lightsail 서버에는 아무것도 추가하지 않는다.
+
+- 함수가 Grafana Cloud Prometheus(`/api/prom/api/v1/query`)를 읽기 전용 토큰(access policy `home-server-3d-status-read`, scope `metrics:read`)으로 조회한다. 비밀 값은 `GRAFANA_PROM_URL`·`GRAFANA_PROM_USER`(인스턴스 id)·`GRAFANA_PROM_TOKEN`, 로컬은 `.dev.vars`(커밋 금지, 예시는 `.dev.vars.example`), 운영은 Pages Secret.
+- 신호 전부를 쿼리 하나(`label_replace`로 `q` 라벨 구분)로 받고, 결과를 60초 캐시(Cache API + isolate 메모리)한다. 실패하면 한 번 더 시도하고, 그래도 실패하면 200으로 `containers: {}`, `host: {}`를 10초만 캐시한다.
+- 응답: `{ updatedAt, containers: { [공개 id]: "ok"|"warn"|"error" }, host: { cpu, mem, disk } }`. `infra.json`의 `source`(cAdvisor 라벨)를 공개 id로 바꾸고, 라벨·호스트 이름·IP·쿼리는 싣지 않는다. 모르는 값은 키를 뺀다(웹은 회색).
+- 상태 규칙(스크레이프 60초 기준):
+  - 호스트 지표(`node_memory_MemTotal_bytes`)가 3분 넘게 없거나 조회 실패 → 컨테이너 키 전부 생략.
+  - 컨테이너 지표(`container_last_seen`)가 없거나 3분 넘게 끊김 → error. healthcheck가 3분 내내 실패(`container_health_state` 0) → error.
+  - 10분 안에 (재)시작(`container_start_time_seconds`) 또는 메모리 한도 90% 이상(한도가 있는 컨테이너만) → warn. 그 밖은 ok.
+  - `container_oom_events_total`은 이 서버에서 믿을 수 없어 쓰지 않는다.
+  - seeder(`quant-lab-demo-seeder`)는 일회성이 아니라 demo-api와 함께 계속 떠 있는 컨테이너(실측)라 같은 규칙을 쓴다.
+- 호스트 %: CPU `1 - avg(rate(idle[5m]))`, 메모리 `1 - MemAvailable/MemTotal`, 디스크 `/`의 `1 - avail/size`. 소수 1자리.
+- 웹(`web/status.js`)은 `/api/status`를 쓴다. `?demo=1`이거나 localhost에서 API가 없으면 가짜 상태(`demo: true`)를 쓴다. 실제 응답에는 `demo`가 없다.
+- 로컬 확인: 저장소 루트에서 `node web/sync.mjs` 후 `npx wrangler pages dev`.
 
 ## 남은 일
 

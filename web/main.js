@@ -235,7 +235,7 @@ function paintLeds() {
     led.status = containerStatus(status, name);
     led.mesh.material.emissive.setRGB(...STATUS_COLOR[led.status]);
   }
-  const unseen = infra.units.flatMap((u) => u.containers ?? []).filter((c) => !leds.has(c));
+  const unseen = infra.units.flatMap((u) => (u.containers ?? []).map((c) => c.id)).filter((id) => !leds.has(id));
   if (unseen.length) console.warn("GLB에 LED가 없는 컨테이너:", unseen);
   document.getElementById("updated").textContent =
     `가짜 상태 · ${new Date(status.updatedAt).toLocaleTimeString("ko-KR")}`;
@@ -274,8 +274,8 @@ renderer.domElement.addEventListener("pointermove", (e) => {
   if (!unit || unit.info.decor) return (tip.style.display = "none");
   const { info } = unit;
   const rows = (info.containers ?? []).map((c) => {
-    const s = containerStatus(status, c);
-    return `<div class="row"><i class="dot ${s}"></i>${c} <span class="muted">${STATUS_LABEL[s]}</span></div>`;
+    const s = containerStatus(status, c.id);
+    return `<div class="row"><i class="dot ${s}"></i>${c.name} <span class="muted">${STATUS_LABEL[s]}</span></div>`;
   });
   const us = unitStatus(status, info);
   tip.innerHTML = `<b>${info.label ?? info.id}${us ? ` <i class="dot ${us}"></i>` : ""}</b>` +

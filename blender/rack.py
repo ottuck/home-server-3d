@@ -85,7 +85,7 @@ def vents(p, root, x0, x1, h, name, rows_per_u=3):
 
 
 def status_panel(p, root, unit, h, x0, name, states):
-    """서비스 이름표와 컨테이너별 상태 LED. LED 이름은 led__<container>."""
+    """서비스 이름표와 컨테이너별 상태 LED. LED 이름은 led__<컨테이너 공개 id>."""
     label = unit.get("label")
     if not label:
         return
@@ -97,8 +97,8 @@ def status_panel(p, root, unit, h, x0, name, states):
     zl = zc - 0.0135 if h > 0.05 else h * 0.2
     for i, c in enumerate(unit.get("containers", [])):
         x = x0 + 0.006 + i * 0.013
-        state = states.get(c, "ok")
-        box(f"led__{c}", (0.009, 0.003, 0.005), (x + 0.004, -FACE_T - 0.001, zl), p.led[state], bevel=0.001, segments=2, parent=root, col=p.col)
+        state = states.get(c["id"], "ok")
+        box(f"led__{c['id']}", (0.009, 0.003, 0.005), (x + 0.004, -FACE_T - 0.001, zl), p.led[state], bevel=0.001, segments=2, parent=root, col=p.col)
     # 전원 버튼
     cyl(f"{name}_power", 0.0042, 0.003, (x0 + pw - 0.006, -FACE_T - 0.0015, zl), p.steel, axis="Y", segments=16, parent=root, col=p.col)
     cyl(f"{name}_power_ring", 0.0047, 0.002, (x0 + pw - 0.006, -FACE_T - 0.0008, zl), p.led_act, axis="Y", segments=16, parent=root, col=p.col)

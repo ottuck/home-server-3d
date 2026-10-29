@@ -8,7 +8,7 @@ export const STATUS_COLOR = {
   unknown: [0.45, 0.47, 0.5],
 };
 
-// 반환 형태: { updatedAt: ISO 문자열, containers: { [cAdvisor container 라벨]: "ok" | "warn" | "error" } }
+// 반환 형태: { updatedAt: ISO 문자열, containers: { [컨테이너 공개 id(infra.json)]: "ok" | "warn" | "error" } }
 // 여기에 없는 컨테이너는 "unknown"으로 칠한다. 데이터가 없으면 절대 정상으로 칠하지 않는다.
 export async function fetchStatus(infra) {
   // Phase 4: return (await fetch("/api/status")).json();
@@ -17,7 +17,7 @@ export async function fetchStatus(infra) {
 
 let tick = 0;
 function fakeStatus(infra) {
-  const names = infra.units.flatMap((u) => u.containers ?? []);
+  const names = infra.units.flatMap((u) => (u.containers ?? []).map((c) => c.id));
   const containers = {};
   names.forEach((name, i) => {
     // 대부분 정상, 몇 개는 돌아가며 주의·오류, 하나는 데이터 없음(키 생략).
@@ -35,7 +35,7 @@ export function containerStatus(status, name) {
 
 // 유닛 상태 = 컨테이너 중 가장 나쁜 상태. 컨테이너가 없는 유닛은 null.
 export function unitStatus(status, unit) {
-  const list = (unit.containers ?? []).map((c) => containerStatus(status, c));
+  const list = (unit.containers ?? []).map((c) => containerStatus(status, c.id));
   if (!list.length) return null;
   if (list.includes("error")) return "error";
   if (list.includes("warn")) return "warn";

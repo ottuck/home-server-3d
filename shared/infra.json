@@ -1,5 +1,5 @@
 {
-  "$comment": "3D 장면과 웹이 함께 읽는 장비 목록. containers는 cAdvisor container 라벨 값(2026-10-29 Grafana Cloud 실측). decor는 실제 장비가 아닌 장식. 화면에는 title·subtitle만 보이고 id(실제 호스트 이름)는 드러내지 않는다.",
+  "$comment": "3D 장면·웹·상태 API가 함께 읽는 장비 목록. 컨테이너 id는 공개용 이름(LED 노드 led__<id>, API 키), name은 화면 표시, source는 cAdvisor container 라벨(2026-10-29 Grafana Cloud 실측, 서버 쪽에서만 쓴다). decor는 실제 장비가 아닌 장식. web/sync.mjs는 host.id와 source를 빼고 웹에 복사한다.",
   "host": {
     "id": "quant-lab-02",
     "title": "AWS Lightsail",
@@ -7,20 +7,27 @@
     "rackUnits": 22
   },
   "units": [
-    { "id": "edge", "kind": "patch", "u": 1, "label": "EDGE",
-      "containers": ["puny-chat-caddy-1", "quant-lab-prod-cloudflared-1", "ur-check-prod-cloudflared-1"] },
+    { "id": "edge", "kind": "patch", "u": 1, "label": "EDGE", "containers": [
+      { "id": "edge-caddy", "name": "caddy", "source": "puny-chat-caddy-1" },
+      { "id": "edge-quant-lab-tunnel", "name": "quant-lab tunnel", "source": "quant-lab-prod-cloudflared-1" },
+      { "id": "edge-ur-check-tunnel", "name": "ur-check tunnel", "source": "ur-check-prod-cloudflared-1" } ] },
     { "id": "network", "kind": "switch", "u": 1, "label": "NETWORK", "containers": [] },
     { "id": "blank-1", "kind": "blank", "u": 1, "decor": true },
-    { "id": "puny-chat", "kind": "server", "u": 2, "label": "PUNY CHAT",
-      "containers": ["puny-chat-server-1"] },
-    { "id": "ur-check", "kind": "server", "u": 2, "label": "UR CHECK",
-      "containers": ["ur-check-prod-app-1", "ur-check-prod-postgres-1"] },
-    { "id": "quant-lab", "kind": "server", "u": 3, "label": "QUANT LAB",
-      "containers": ["quant-lab-prod-api-1", "quant-lab-prod-worker-1", "quant-lab-prod-db-1"] },
-    { "id": "quant-lab-demo", "kind": "server", "u": 2, "label": "QUANT LAB DEMO",
-      "containers": ["quant-lab-demo-demo-api-1", "quant-lab-demo-demo-seeder-1"] },
-    { "id": "monitoring", "kind": "server", "u": 1, "label": "MONITORING",
-      "containers": ["monitoring-alloy-1", "monitoring-docker-proxy-1"] },
+    { "id": "puny-chat", "kind": "server", "u": 2, "label": "PUNY CHAT", "containers": [
+      { "id": "puny-chat-server", "name": "server", "source": "puny-chat-server-1" } ] },
+    { "id": "ur-check", "kind": "server", "u": 2, "label": "UR CHECK", "containers": [
+      { "id": "ur-check-app", "name": "app", "source": "ur-check-prod-app-1" },
+      { "id": "ur-check-db", "name": "postgres", "source": "ur-check-prod-postgres-1" } ] },
+    { "id": "quant-lab", "kind": "server", "u": 3, "label": "QUANT LAB", "containers": [
+      { "id": "quant-lab-api", "name": "api", "source": "quant-lab-prod-api-1" },
+      { "id": "quant-lab-worker", "name": "worker", "source": "quant-lab-prod-worker-1" },
+      { "id": "quant-lab-db", "name": "db", "source": "quant-lab-prod-db-1" } ] },
+    { "id": "quant-lab-demo", "kind": "server", "u": 2, "label": "QUANT LAB DEMO", "containers": [
+      { "id": "quant-lab-demo-api", "name": "api", "source": "quant-lab-demo-demo-api-1" },
+      { "id": "quant-lab-demo-seeder", "name": "seeder", "source": "quant-lab-demo-demo-seeder-1" } ] },
+    { "id": "monitoring", "kind": "server", "u": 1, "label": "MONITORING", "containers": [
+      { "id": "monitoring-alloy", "name": "alloy", "source": "monitoring-alloy-1" },
+      { "id": "monitoring-docker-proxy", "name": "docker-proxy", "source": "monitoring-docker-proxy-1" } ] },
     { "id": "blank-2", "kind": "blank", "u": 1, "decor": true },
     { "id": "disk", "kind": "storage", "u": 2, "label": "DISK", "containers": [] },
     { "id": "blank-3", "kind": "blank", "u": 1, "decor": true },

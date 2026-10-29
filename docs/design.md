@@ -6,7 +6,7 @@
 
 - 화면(간판·HUD)에는 실제 호스트 이름을 쓰지 않고 `AWS Lightsail` / `Home Server · 2 GB`로 표시한다. `host.id`는 데이터 연결용으로만 쓴다.
 - **랙 1대 = quant-lab-02 인스턴스.** 서비스는 랙에 꽂힌 장비(유닛)이고, 컨테이너 하나가 LED 하나다.
-- 장비 목록의 기준은 [`shared/infra.json`](../shared/infra.json)이다. Blender와 웹이 같은 파일을 읽는다. `containers` 값은 cAdvisor `container` 라벨이다(2026-10-29 실측, 13개).
+- 장비 목록의 기준은 [`shared/infra.json`](../shared/infra.json)이다. Blender·웹·상태 API가 같은 파일을 읽는다. 컨테이너마다 공개 `id`(LED 이름·API 키), 화면 표시 `name`(api, worker 등), 서버 전용 `source`(cAdvisor `container` 라벨, 2026-10-29 실측 13개)를 둔다. 웹에 복사할 때(`web/sync.mjs`) `host.id`와 `source`는 뺀다.
 - `decor: true`는 실제 장비가 아닌 장식이다(빈 패널, UPS). UI에서 실제 장비와 구분한다.
 - 서버 밖에 있는 서비스는 랙에 넣지 않는다. Grafana Cloud는 뒤 벽 모니터, Sentry는 수납장 위 태블릿으로 둔다.
 - UR MCP는 이 서버에 없다. 어디서 돌고 있는지 확인한 뒤 배치한다.
@@ -32,7 +32,7 @@
 - 좌표: 정면 -Y, 위 +Z, 미터 단위. 1U = 44.5mm, 전면판 19인치, 랙 외곽 0.66 × 0.66m, 22U.
 - GLB 노드 이름 규칙(웹이 이 이름으로 찾는다):
   - `unit__<id>`: 장비 단위(extras에 `kind`, `decor`). 몸체는 `<id>_body`(접두사 없음)
-  - `led__<container>`: 컨테이너 상태 LED
+  - `led__<컨테이너 공개 id>`: 컨테이너 상태 LED(예: `led__quant-lab-api`)
   - `*_screen`: 화면. 웹이 실시간 그림으로 바꿔 끼운다
   - `skyline`: 창밖 풍경. 밤 그림은 `assets/textures/skyline_night.png`
   - 나머지: `prop__<소품>`, `rack_frame`, `room_shell`로 합쳐 둔다

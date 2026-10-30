@@ -77,17 +77,17 @@ docs/        설계 기록, 구성도, 렌더 이미지
 3. **Cloudflare Pages에 연결하기.** Cloudflare 대시보드에서 포크한 저장소로 Pages 프로젝트를 만들고 아래처럼 설정합니다. 이후로는 push할 때마다 자동으로 배포됩니다.
    - 빌드 명령: `node web/sync.mjs`
    - 빌드 출력 디렉터리: `web`
-4. **실제 지표 연결하기(선택).** 서버에서 [Grafana Alloy](https://grafana.com/docs/alloy/)로 node exporter(호스트)와 cAdvisor(컨테이너) 지표를 Grafana Cloud에 보내고 있어야 합니다. Pages 프로젝트의 환경 변수(Secret)에 다음 값을 넣습니다.
+4. **실제 지표 연결하기(선택).** 아무 값도 넣지 않아도 사이트는 예시 데이터로 그대로 뜹니다. 내 서버의 실제 상태를 띄우고 싶을 때만, 서버에서 [Grafana Alloy](https://grafana.com/docs/alloy/)로 node exporter(호스트)와 cAdvisor(컨테이너) 지표를 Grafana Cloud에 보낸 뒤 Pages 프로젝트의 환경 변수(Secret)에 아래 값을 넣습니다.
 
-   | 이름 | 필수 | 값 |
+   | 이름 | 언제 넣나 | 값 |
    | --- | --- | --- |
-   | `GRAFANA_PROM_URL` | 예 | Grafana Cloud Prometheus 주소(`https://prometheus-prod-…grafana.net/api/prom`) |
-   | `GRAFANA_PROM_USER` | 예 | Prometheus 인스턴스 id(숫자) |
-   | `GRAFANA_PROM_TOKEN` | 예 | `metrics:read` 권한만 있는 액세스 정책 토큰 |
-   | `CONTAINER_SOURCES` | 아니오 | 공개 id와 실제 컨테이너 이름이 다를 때 연결표. 예: `{"edge-caddy":"caddy"}` |
-   | `PROM_CADVISOR_SELECTOR` | 아니오 | 컨테이너 지표를 고르는 라벨. 기본값 `job="integrations/cadvisor"` |
-   | `PROM_NODE_SELECTOR` | 아니오 | 호스트 지표를 고르는 라벨. 기본값 `job="integrations/unix"` |
-   | `GITHUB_TOKEN` | 아니오 | GitHub API 호출 한도가 부족할 때 |
+   | `GRAFANA_PROM_URL` | 실제 지표를 쓸 때(셋 다) | Grafana Cloud Prometheus 주소(`https://prometheus-prod-…grafana.net/api/prom`) |
+   | `GRAFANA_PROM_USER` | 실제 지표를 쓸 때(셋 다) | Prometheus 인스턴스 id(숫자) |
+   | `GRAFANA_PROM_TOKEN` | 실제 지표를 쓸 때(셋 다) | `metrics:read` 권한만 있는 액세스 정책 토큰 |
+   | `CONTAINER_SOURCES` | 공개 id와 실제 컨테이너 이름이 다를 때 | 연결표. 예: `{"edge-caddy":"caddy"}` |
+   | `PROM_CADVISOR_SELECTOR` | 지표 라벨이 기본값과 다를 때 | 컨테이너 지표를 고르는 라벨. 기본값 `job="integrations/cadvisor"` |
+   | `PROM_NODE_SELECTOR` | 지표 라벨이 기본값과 다를 때 | 호스트 지표를 고르는 라벨. 기본값 `job="integrations/unix"` |
+   | `GITHUB_TOKEN` | GitHub API 호출 한도가 부족할 때 | GitHub 토큰 |
 
 5. **링크 미리보기 주소 바꾸기.** [`web/index.html`](web/index.html) 위쪽의 `og:url`, `og:image`를 내 도메인으로 바꿉니다.
 

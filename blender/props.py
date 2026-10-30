@@ -68,14 +68,15 @@ class Mats:
         b = self.linen_dark.node_tree.nodes["Principled BSDF"]
         b.inputs["Emission Color"].default_value = (1.0, 0.62, 0.32, 1.0)
         b.inputs["Emission Strength"].default_value = 0.12 * glow
-        self.lining = mat("arc_lining", (0.96, 0.94, 0.90), rough=0.7, emit=(1.0, 0.84, 0.62), strength=1.0 * glow)
+        self.lining = mat("arc_lining", (0.96, 0.94, 0.90), rough=0.7, emit=(1.0, 0.68, 0.40), strength=0.7 * glow)
         self.wire = mat("black_wire", (0.03, 0.03, 0.035), rough=0.4, metal=0.6)
         self.keycap = mat("keycap_ivory", (0.86, 0.83, 0.75), rough=0.5)
         self.keycap_mod = mat("keycap_gray", (0.48, 0.47, 0.44), rough=0.5)
         self.keycap_accent = mat("keycap_accent", (0.78, 0.20, 0.12), rough=0.5)
         self.keyboard_case = mat("keyboard_case", (0.80, 0.77, 0.69), rough=0.4)
-        self.shade = mat("lamp_shade", (0.92, 0.86, 0.74), rough=0.9, emit=(1.0, 0.78, 0.50), strength=1.6 * glow)
-        self.bulb = mat("bulb", (1.0, 0.95, 0.85), rough=0.3, emit=(1.0, 0.80, 0.55), strength=0.5 + 25.0 * glow)
+        # 조명 빛은 2700K 전구색: 갓·전구 발광도 같은 호박빛으로 맞추고, 하얗게 날아가지 않게 세기를 낮춘다
+        self.shade = mat("lamp_shade", (0.92, 0.86, 0.74), rough=0.9, emit=(1.0, 0.64, 0.34), strength=1.0 * glow)
+        self.bulb = mat("bulb", (1.0, 0.92, 0.80), rough=0.3, emit=(1.0, 0.66, 0.38), strength=0.5 + 14.0 * glow)
         self.sign_glow = mat("sign_glow", (0.95, 0.88, 0.72), rough=0.5, emit=(1.0, 0.72, 0.40), strength=6.0 * glow)
         self.label = mat("label_ink", (0.90, 0.87, 0.80), rough=0.6)
         self.screen_boost = 1.0 if night else 0.6
@@ -94,7 +95,7 @@ class Mats:
         e.image = image("tex_rattan_glow", 512, 512, light)
         nt.links.new(c.outputs["Color"], bsdf.inputs["Base Color"])
         nt.links.new(e.outputs["Color"], bsdf.inputs["Emission Color"])
-        bsdf.inputs["Emission Strength"].default_value = max(2.5 * glow, 0.001)
+        bsdf.inputs["Emission Strength"].default_value = max(1.8 * glow, 0.001)
         bsdf.inputs["Roughness"].default_value = 0.8
         return mt
 

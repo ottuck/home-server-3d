@@ -18,7 +18,7 @@ THEMES = {
     "day": dict(bg=(0.93, 0.91, 0.87), world=(0.82, 0.80, 0.76), world_strength=0.65, sun=2.6, fill=170.0, window=140.0,
                 window_color=(1.0, 0.93, 0.80), floor_lamp=0.0, desk_lamp=0.0, sconce=0.0, table_lamp=0.0, arc_lamp=0.0),
     "night": dict(bg=(0.025, 0.032, 0.065), world=(0.010, 0.016, 0.040), world_strength=0.30, sun=0.0, fill=0.0, window=18.0,
-                  window_color=(0.50, 0.62, 1.0), floor_lamp=55.0, desk_lamp=14.0, sconce=22.0, table_lamp=20.0, arc_lamp=38.0),
+                  window_color=(0.50, 0.62, 1.0), floor_lamp=46.0, desk_lamp=14.0, sconce=22.0, table_lamp=20.0, arc_lamp=38.0),
 }
 
 
@@ -139,13 +139,13 @@ def lights(theme):
         ob.rotation_euler = Euler([R(a) for a in rot])
         bpy.context.scene.collection.objects.link(ob)
 
-    warm = (1.0, 0.72, 0.45)
+    warm = (1.0, 0.62, 0.34)  # 2700K 전구색
     add("sun", "SUN", (0, 0, 6), (50, 0, -40), t["sun"], (1.0, 0.91, 0.78), angle=R(5))
     add("fill", "AREA", (3.2, -3.4, 3.6), (55, 0, 42), t["fill"], (1.0, 0.96, 0.90), size=4.0)
     wx0, wx1, wz0, wz1 = WIN
     add("window_light", "AREA", ((wx0 + wx1) / 2, Y1 + 0.05, (wz0 + wz1) / 2), (-90, 0, 0), t["window"], t["window_color"],
         shape="RECTANGLE", size=wx1 - wx0, size_y=wz1 - wz0)
-    add("floor_lamp_light", "POINT", (-1.36, -1.08, 1.40), (0, 0, 0), t["floor_lamp"], warm, shadow_soft_size=0.12)
+    add("floor_lamp_light", "POINT", (-1.36, -1.08, 1.40), (0, 0, 0), t["floor_lamp"], warm, shadow_soft_size=0.22)
     add("arc_lamp_light", "POINT", (1.25, -0.68, 1.27), (0, 0, 0), t["arc_lamp"], warm, shadow_soft_size=0.08)
     add("desk_lamp_light", "POINT", (-1.43, 0.58, 1.10), (0, 0, 0), t["desk_lamp"], warm, shadow_soft_size=0.05)
     add("table_lamp_light", "POINT", (0.93, Y1 - 0.20, 0.70), (0, 0, 0), t["table_lamp"], warm, shadow_soft_size=0.06)

@@ -248,5 +248,5 @@ def rattan(n=512, around=26, up=13):
     bamboo, gap = np.array([0.74, 0.55, 0.32]), np.array([0.10, 0.07, 0.04])
     col[..., :3] = _srgb(np.where(strip[..., None], bamboo * shade[..., None], gap))
     glow = np.ones((n, n, 4), dtype=np.float32)
-    glow[..., :3] = np.where(strip[..., None], np.array([0.03, 0.02, 0.01]), np.array([1.0, 0.72, 0.40]))
+    glow[..., :3] = np.where(strip[..., None], np.array([0.03, 0.02, 0.01]), np.array([1.0, 0.62, 0.30]))
     return col, glow

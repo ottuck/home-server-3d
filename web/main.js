@@ -42,7 +42,7 @@ const THEMES = {
   },
   night: {
     bg: 0x1a2340, hemi: 0.07, sun: 0, env: 0.04, window: 0.6, lamps: true, rack: 1.2,
-    screen: 1.0, led: 14, bloom: [0.28, 0.25, 1.5], // 밤 블룸은 빛나는 것만 살짝 번지게(벽이 뿌옇게 번지지 않게)
+    screen: 1.0, led: 14, bloom: [0.22, 0.3, 1.6], // 밤 블룸은 빛나는 것만 살짝 번지게(벽이 뿌옇게 번지지 않게)
   },
 };
 
@@ -98,9 +98,9 @@ const windowLight = new THREE.SpotLight(0xfff0d8, 1, 6, THREE.MathUtils.degToRad
 windowLight.position.copy(B(-0.85, 1.55, 1.45));
 windowLight.target.position.copy(B(-0.4, -0.3, 0.2));
 // 밤 조명: 스탠드, 책상 등, 탁상등, 벽등(room.py 위치와 같다)
-const warm = 0xffb873;
+const warm = 0xffa45a; // 2700K 전구색
 const lamps = [
-  [B(-1.36, -1.08, 1.42), 3.0, 6.5, true], // 스탠드: 방 전체를 밝히는 주 조명
+  [B(-1.36, -1.08, 1.42), 2.6, 7.5, true], // 스탠드: 방 전체를 밝히는 주 조명(옆 벽이 하얗게 뜨지 않게 세기는 낮추고 넓게)
   [B(-1.43, 0.58, 1.10), 0.7, 2.5, false],
   [B(0.93, 1.20, 0.70), 0.9, 3.0, false],
   [B(-0.13, 1.31, 1.74), 0.9, 3.0, false],
@@ -568,11 +568,11 @@ const SWITCHES = [
 ];
 // Blender에서 낮 테마로 내보내 빛이 꺼진 재질에 다시 줄 발광: [r, g, b, 켰을 때 세기, 껐을 때 세기]
 const GLOW = {
-  lamp_shade: [1.0, 0.78, 0.50, 0.75, 0],
-  rattan_shade: [1.0, 0.70, 0.40, 2.5, 0],
-  arc_lining: [1.0, 0.84, 0.62, 1.0, 0],
-  lamp_linen: [1.0, 0.62, 0.32, 0.12, 0],
-  bulb: [1.0, 0.80, 0.55, 2.2, 0.3],
+  lamp_shade: [1.0, 0.64, 0.34, 0.5, 0],
+  rattan_shade: [1.0, 0.62, 0.30, 1.8, 0],
+  arc_lining: [1.0, 0.66, 0.38, 0.7, 0],
+  lamp_linen: [1.0, 0.58, 0.28, 0.12, 0],
+  bulb: [1.0, 0.68, 0.40, 1.5, 0.3],
   sign_glow: [1.0, 0.72, 0.40, 2.2, 0],
 };
 const switches = []; // { label, light, glow: 재질[], hit: 투명 상자, on, level }

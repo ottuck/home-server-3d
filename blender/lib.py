@@ -224,6 +224,40 @@ def tex_mat(name, img, rough=0.5, coat=0.0):
     return m
 
 
+def fabric_mat(name, color_img, normal_img, rough=0.9, strength=1.0):
+    """직물 재질: 바탕색 그림 + 노멀 맵(둘 다 GLB로 나간다). 물체에 uv_box로 UV를 깔아야 한다."""
+    m = node_mat(name)
+    nt = m.node_tree
+    bsdf = nt.nodes["Principled BSDF"]
+    c = nt.nodes.new("ShaderNodeTexImage")
+    c.image = color_img
+    nt.links.new(c.outputs["Color"], bsdf.inputs["Base Color"])
+    normal_img.colorspace_settings.name = "Non-Color"
+    n = nt.nodes.new("ShaderNodeTexImage")
+    n.image = normal_img
+    nm = nt.nodes.new("ShaderNodeNormalMap")
+    nm.inputs["Strength"].default_value = strength
+    nt.links.new(n.outputs["Color"], nm.inputs["Color"])
+    nt.links.new(nm.outputs["Normal"], bsdf.inputs["Normal"])
+    bsdf.inputs["Roughness"].default_value = rough
+    return m
+
+
+def uv_box(ob, tile):
+    """상자 투영 UV: 면마다 가장 가까운 축으로 물체 좌표를 펼쳐, tile(m)마다 그림 한 장이 반복되게 한다."""
+    me = ob.data
+    uv = me.uv_layers[0] if me.uv_layers else me.uv_layers.new(name="UVMap")
+    sc = ob.scale
+    for poly in me.polygons:
+        n = poly.normal
+        ax = max(range(3), key=lambda i: abs(n[i]))
+        a, b = [(1, 2), (0, 2), (0, 1)][ax]
+        for li in poly.loop_indices:
+            co = me.vertices[me.loops[li].vertex_index].co
+            uv.data[li].uv = (co[a] * sc[a] / tile, co[b] * sc[b] / tile)
+    return ob
+
+
 def screen_mat(name, img, strength=1.0):
     """빛을 내는 화면 재질(조명 영향 없이 그림이 그대로 보인다)."""
     m = node_mat(name)

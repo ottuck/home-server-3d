@@ -71,7 +71,7 @@ def layout(m, night, col, rack_root, cable_mats):
     props.wall_screen(m, "screen_grafana", (1.17, Y1 - 0.035, 1.47), 0, col,
                       image("tex_dashboard", 640, 360, tx.dashboard()), "GRAFANA CLOUD")
     props.cabinet(m, "cabinet", (1.18, Y1 - 0.22, 0), 0, col)
-    props.speaker(m, (0.99, Y1 - 0.22, 0.52), -12, col)
+    props.speaker(m, (1.18, Y1 - 0.22, 0.52), -8, col)
     props.plant(m, "plant_cabinet", (1.46, Y1 - 0.22, 0.52), col, height=0.2, pot=3, seed=8)
     props.table_lamp(m, "table_lamp", (0.80, Y1 - 0.20, 0.52), col)
     props.sconce(m, "sconce", (-0.13, Y1 - 0.021, 1.72), 0, col)
@@ -80,7 +80,8 @@ def layout(m, night, col, rack_root, cable_mats):
         dx = -0.04 + k * 0.025
         cable(f"tray_drop_{k}", [(0.30 + dx, Y1 - 0.12, 2.04), (0.30 + dx, Y1 - 0.16, 1.70), (0.30 + dx, 1.12, 1.36)],
               0.0055, cable_mats[k % len(cable_mats)], col=col)
-    props.plant(m, "plant_corner", (-1.42, 1.10, 0), col, height=1.0, pot=0, seed=3)
+    # 구석 식물은 책상 너머로 잎이 보이도록 키를 키운다
+    props.plant(m, "plant_corner", (-1.42, 1.10, 0), col, height=1.0, pot=0, seed=3, reach=1.9)
     # 왼쪽 벽: 작업 책상, 의자, 선반, 간판
     # 와이드 모니터: 좌우로 나눈 에디터 두 칸
     code = np.concatenate([tx.code(w=420, h=340, seed=3), tx.code(w=420, h=340, seed=9)], axis=1)
@@ -98,7 +99,8 @@ def layout(m, night, col, rack_root, cable_mats):
     props.dock(m, "dock", (-0.62, Y1 - 0.07, 0), 0, col)
     props.vacuum(m, (-0.62, Y1 - 0.25, 0), col)
     props.blinds(m, "blinds", WIN[0] - 0.03, WIN[1] + 0.03, WIN[3] + 0.035, Y1 - 0.035, col)
-    props.plant(m, "plant_window", (-0.12, 1.12, 0), col, height=0.55, pot=1, seed=12)
+    # 랙 뒤에 가려지지 않게 수납장 앞 빈 바닥에 둔다
+    props.plant(m, "plant_side", (1.42, 0.62, 0), col, height=0.55, pot=1, seed=12)
 
 
 def lights(theme):

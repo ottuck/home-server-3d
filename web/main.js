@@ -694,7 +694,7 @@ function stepVacuum(t) {
   }
 }
 
-// 눌러서 움직이는 소품: 책 덮개, 안락의자 쿠션, 의자 윗부분, 스피커, 블라인드.
+// 눌러서 움직이는 소품: 책 덮개, 안락의자 쿠션, 의자 윗부분, 스피커, 화분, 블라인드.
 // 보통은 value가 target을 따라가며(빠르게 시작해 천천히 멈춘다), spring이 있으면 0으로 돌아오는 감쇠 진동을 한다.
 // apply가 그 값(과 시각)으로 모양을 바꾼다.
 const toys = []; // { label, pick: Object3D[], click(toy), apply(value, t), rate | spring: [강성, 감쇠], target, value, vel }
@@ -747,6 +747,14 @@ function setupToys(root) {
           nextNote = t + 0.45 + Math.random() * 0.35;
         }
       } });
+  }
+
+  // 화분: 누르면 바닥을 축으로 살짝 흔들리다 멈춘다. 흔들리는 방향은 화분마다 다르다.
+  for (const o of root.children) {
+    if (!o.name.startsWith("part__") || !o.name.includes("plant")) continue;
+    const a = Math.random() * Math.PI * 2;
+    add({ label: "화분", pick: [o], spring: [55, 3.5], click: (t) => (t.vel += 2.5),
+      apply: (k) => o.rotation.set(0.12 * k * Math.cos(a), 0, 0.12 * k * Math.sin(a)) });
   }
 
   const slats = [];

@@ -5,7 +5,8 @@ import math
 
 import numpy as np
 
-from lib import box, cable, cone, cyl, empty, lathe, mat, mesh, screen_mat, screen_plane, sphere, text
+import textures as tx
+from lib import box, cable, cone, cyl, empty, fabric_mat, image, lathe, mat, mesh, screen_mat, screen_plane, sphere, text, uv_box
 
 R = math.radians
 
@@ -34,6 +35,10 @@ class Mats:
         self.books = [mat(f"book_{i}", c, rough=0.7) for i, c in enumerate([
             (0.42, 0.52, 0.40), (0.82, 0.76, 0.62), (0.62, 0.30, 0.18), (0.12, 0.20, 0.35),
             (0.78, 0.58, 0.22), (0.25, 0.25, 0.27), (0.70, 0.66, 0.58), (0.35, 0.22, 0.15)])]
+        self.pages = mat("book_pages", (0.86, 0.82, 0.71), rough=0.85)
+        self.armchair_fabric = self._fabric("armchair_fabric", (0.40, 0.50, 0.38), "weave", 8, 3)
+        self.pillow_fabric = self._fabric("pillow_fabric", (0.66, 0.60, 0.50), "weave", 10, 4)
+        self.chair_mesh = self._fabric("chair_mesh", (0.11, 0.115, 0.125), "mesh", 10, 5)
         self.vacuum = mat("vacuum_white", (0.88, 0.88, 0.86), rough=0.35, coat=0.3)
         self.vacuum_led = mat("vacuum_led", (0.30, 1.0, 0.55), rough=0.3, emit=(0.30, 1.0, 0.55), strength=4.0)
         self.blind = mat("blind", (0.93, 0.91, 0.86), rough=0.6)
@@ -42,6 +47,12 @@ class Mats:
         self.sign_glow = mat("sign_glow", (0.95, 0.88, 0.72), rough=0.5, emit=(1.0, 0.72, 0.40), strength=6.0 * glow)
         self.label = mat("label_ink", (0.90, 0.87, 0.80), rough=0.6)
         self.screen_boost = 1.0 if night else 0.6
+
+    @staticmethod
+    def _fabric(name, color, kind, cells, seed):
+        col, nrm = tx.fabric(color, kind=kind, cells=cells, seed=seed)
+        return fabric_mat(name, image(f"tex_{name}", 256, 256, col), image(f"tex_{name}_normal", 256, 256, nrm),
+                          rough=0.95 if kind == "weave" else 0.8)
 
 
 def _root(name, loc, rotz, col):
@@ -52,19 +63,26 @@ def _root(name, loc, rotz, col):
 
 # ---------------------------------------------------------------- 식물
 
-def _leaf(name, length, width, elev, droop, yaw, base, material, root, col):
-    n = 7
+def _leaf(name, length, width, elev, droop, yaw, base, material, root, col, twist=0.0):
+    """잎 한 장: 가장 넓은 곳이 아래쪽 40%쯤인 뾰족한 잎. 가운데 잎맥을 따라 살짝 V자로 접히고,
+    가장자리는 아래로 말리며, 끝으로 갈수록 처지고 비틀린다."""
+    n, across = 14, (-1.0, -0.5, 0.0, 0.5, 1.0)
     verts, faces = [], []
     for i in range(n + 1):
         t = i / n
         s = t * length
         y = s * math.cos(elev)
         z = s * math.sin(elev) - droop * s * s
-        hw = width / 2 * (math.sin(math.pi * min(t * 1.05, 1.0)) ** 0.8) + 0.002
-        verts += [(-hw, y, z - hw * 0.12), (0, y, z), (hw, y, z - hw * 0.12)]
+        hw = width / 2 * math.sin(math.pi * t ** 0.75) ** 0.75 + 0.0015
+        tw = twist * t
+        for k in across:
+            x, dz = k * hw, hw * (0.22 * abs(k) - 0.30 * k * k)
+            verts.append((x * math.cos(tw) - dz * math.sin(tw), y, z + x * math.sin(tw) + dz * math.cos(tw)))
+    w = len(across)
     for i in range(n):
-        a = i * 3
-        faces += [(a, a + 1, a + 4, a + 3), (a + 1, a + 2, a + 5, a + 4)]
+        for k in range(w - 1):
+            a = i * w + k
+            faces.append((a, a + 1, a + w + 1, a + w))
     return mesh(name, verts, faces, base, material, rot=(0, 0, yaw), parent=root, col=col)
 
 
@@ -97,23 +115,29 @@ def planter(m, name, style, pr, ph, root, col):
     return soil
 
 
-def plant(m, name, loc, col, height=1.0, pot=0, seed=1, rotz=0):
+def plant(m, name, loc, col, height=1.0, pot=0, seed=1, rotz=0, reach=1.0):
+    """화분 식물. height는 화분과 잎 크기, reach는 줄기가 뻗는 높이 배율이다(키 큰 식물은 reach를 키운다).
+    웹에서 누르면 흔들리므로 화분 바닥 중심을 축으로 하는 부분(part__)이다."""
     rng = np.random.default_rng(seed)
-    root = _root(name, loc, rotz, col)
+    root = _root(f"part__{name}", loc, rotz, col)
     pr = 0.09 + 0.08 * height
     ph = 0.12 + 0.18 * height
     soil = planter(m, name, pot, pr, ph, root, col)
-    count = int(8 + 10 * height)
+    count = int((8 + 10 * height) * (0.6 + 0.4 * reach))
+    grow = height * reach
     for i in range(count):
         yaw = rng.uniform(0, 2 * math.pi)
-        stem_h = ph + rng.uniform(0.05, 0.55) * height
-        lean = rng.uniform(0.01, 0.06) * (1 + height)
+        rise = rng.uniform(0.15, 1.0) ** 0.7  # 키 큰 줄기가 많고 짧은 줄기는 적게
+        stem_h = ph + (0.05 + 0.5 * rise) * grow
+        lean = rng.uniform(0.02, 0.07) * (1 + height) * (0.5 + 0.5 * reach) * (1.2 - 0.5 * rise)
         bx, by = -math.sin(yaw) * lean, math.cos(yaw) * lean
-        cable(f"{name}_stem_{i}", [(0, 0, soil), (bx * 0.5, by * 0.5, (ph + stem_h) / 2), (bx, by, stem_h)],
-              0.0025 + 0.002 * height, m.stem, parent=root, col=col)
-        _leaf(f"{name}_leaf_{i}", rng.uniform(0.10, 0.17) * (0.6 + 0.6 * height), rng.uniform(0.045, 0.07) * (0.7 + 0.5 * height),
-              R(rng.uniform(15, 55)), rng.uniform(1.0, 3.5) / (0.6 + height), yaw, (bx, by, stem_h),
-              m.leaf[int(rng.integers(0, 3))], root, col)
+        # 줄기는 아래에서 곧게 오르다 끝에서 바깥으로 휜다
+        cable(f"{name}_stem_{i}", [(0, 0, soil), (bx * 0.25, by * 0.25, ph + (stem_h - ph) * 0.6), (bx, by, stem_h)],
+              0.0022 + 0.0018 * height * (0.7 + 0.3 * reach), m.stem, parent=root, col=col)
+        size = 0.6 + 0.6 * height * (0.75 + 0.25 * reach)
+        _leaf(f"{name}_leaf_{i}", rng.uniform(0.10, 0.17) * size, rng.uniform(0.045, 0.07) * (0.7 + 0.5 * height),
+              R(rng.uniform(20, 60)), rng.uniform(1.0, 3.0) / (0.6 + height), yaw, (bx, by, stem_h),
+              m.leaf[int(rng.integers(0, 3))], root, col, twist=rng.uniform(-0.5, 0.5))
     return root
 
 
@@ -197,6 +221,7 @@ def desk(m, name, loc, rotz, col, screen):
 
 
 def chair(m, name, loc, rotz, col):
+    """메시 등판 사무용 의자. 팔걸이는 좌판 아래에서 나온 L자 받침 위에 패드를 얹는다."""
     root = _root(name, loc, rotz, col)
     for i in range(5):
         a = R(90 + i * 72)
@@ -204,35 +229,83 @@ def chair(m, name, loc, rotz, col):
         b = box(f"{name}_leg_{i}", (0.26, 0.04, 0.03), (x / 2, y / 2, 0.065), m.black_metal, bevel=0.01, parent=root, col=col)
         b.rotation_euler = (0, 0, a)
         sphere(f"{name}_caster_{i}", 0.028, (x, y, 0.03), m.charcoal, parent=root, col=col)
-    cyl(f"{name}_gas", 0.025, 0.30, (0, 0, 0.22), m.black_metal, segments=20, parent=root, col=col)
+    cyl(f"{name}_gas", 0.022, 0.30, (0, 0, 0.23), m.black_metal, segments=20, parent=root, col=col)
+    cyl(f"{name}_gas_cover", 0.032, 0.12, (0, 0, 0.14), m.charcoal, segments=24, bevel=0.004, parent=root, col=col)
     # 좌판 위쪽은 웹에서 빙글 돌리는 부분이다(축은 의자 중심)
     top = empty(f"part__{name}_top", (0, 0, 0), parent=root, col=col)
-    box(f"{name}_seat", (0.50, 0.48, 0.09), (0, 0, 0.44), m.fabric_dark, bevel=0.035, parent=top, col=col)
-    back = box(f"{name}_back", (0.47, 0.07, 0.56), (0, 0.24, 0.80), m.fabric_dark, bevel=0.035, parent=top, col=col)
-    back.rotation_euler = (R(-8), 0, 0)
+    box(f"{name}_mech", (0.20, 0.22, 0.04), (0, 0.02, 0.37), m.black_metal, bevel=0.01, parent=top, col=col)
+    uv_box(box(f"{name}_seat", (0.50, 0.48, 0.08), (0, 0, 0.43), m.chair_mesh, bevel=0.04, segments=5, parent=top, col=col), 0.06)
+    # 등받이: 좌판 뒤 아래에서 올라오는 받침대에 검은 틀과 메시 판을 단다
+    cable(f"{name}_spine", [(0, 0.10, 0.38), (0, 0.27, 0.40), (0, 0.29, 0.58)], 0.018, m.black_metal, parent=top, col=col)
+    frame = box(f"{name}_back_frame", (0.48, 0.03, 0.54), (0, 0.295, 0.82), m.black_metal, bevel=0.08, segments=6, parent=top, col=col)
+    frame.rotation_euler = (R(-8), 0, 0)
+    mesh_back = uv_box(box(f"{name}_back", (0.44, 0.025, 0.50), (0, 0.272, 0.82), m.chair_mesh, bevel=0.07, segments=6, parent=top, col=col), 0.06)
+    mesh_back.rotation_euler = (R(-8), 0, 0)
     for sx in (-1, 1):
-        box(f"{name}_arm_post_{sx}", (0.03, 0.04, 0.18), (sx * 0.26, 0.04, 0.55), m.black_metal, bevel=0.008, parent=top, col=col)
-        box(f"{name}_arm_pad_{sx}", (0.06, 0.26, 0.03), (sx * 0.26, 0.02, 0.65), m.charcoal, bevel=0.012, parent=top, col=col)
+        cable(f"{name}_arm_{sx}", [(sx * 0.10, 0.03, 0.385), (sx * 0.27, 0.03, 0.40), (sx * 0.285, 0.03, 0.61)], 0.012, m.black_metal, parent=top, col=col)
+        box(f"{name}_arm_pad_{sx}", (0.07, 0.24, 0.028), (sx * 0.285, 0.01, 0.628), m.charcoal, bevel=0.012, segments=3, parent=top, col=col)
     return root
 
 
 # ---------------------------------------------------------------- 수납·가구
 
+def _shelf_book(m, name, loc, size, rng, root, col, lean=0.0, lying=False):
+    """양장본 한 권: 앞뒤 표지, 등(-Y), 그 사이 크림색 책장 덩어리. 등에는 띠나 제목 칸을 둔다.
+    size는 (가로, 깊이, 높이)이고, lying이면 눕혀서 등이 앞을 본다(가로가 책 높이, 높이가 두께)."""
+    w, d, h = size
+    cover = m.books[int(rng.integers(0, len(m.books)))]
+    r = empty(name, loc, parent=root, col=col)
+    r.rotation_euler = (0, lean, 0)
+    t = 0.0025  # 표지 두께
+    if lying:
+        for z in (t / 2, h - t / 2):
+            box(f"{name}_board_{z:.3f}", (w, d, t), (0, 0, z), cover, bevel=0.0008, segments=1, parent=r, col=col)
+        box(f"{name}_pages", (w - 0.008, d - 0.006, h - 2 * t), (0.002, 0.002, h / 2), m.pages, parent=r, col=col)
+    else:
+        for x in (-w / 2 + t / 2, w / 2 - t / 2):
+            box(f"{name}_board_{x:.3f}", (t, d, h), (x, 0, h / 2), cover, bevel=0.0008, segments=1, parent=r, col=col)
+        box(f"{name}_pages", (w - 2 * t, d - 0.006, h - 0.008), (0, 0.002, h / 2 - 0.001), m.pages, parent=r, col=col)
+    box(f"{name}_spine", (w, 0.003, h), (0, -d / 2 + 0.0015, h / 2), cover, bevel=0.001, segments=1, parent=r, col=col)
+    roll = rng.random()
+    across, tall = (w, h) if not lying else (h, w)
+    if roll < 0.55:  # 위아래 띠 두 줄
+        band = m.brass if rng.random() < 0.5 else m.ivory
+        for k in (0.12, 0.88):
+            z = h * k if not lying else h / 2
+            x = 0 if not lying else w * (k - 0.5)
+            box(f"{name}_band_{k}", (w + 0.0004, 0.0012, 0.004) if not lying else (0.004, 0.0012, h + 0.0004),
+                (x, -d / 2 - 0.0002, z), band, parent=r, col=col)
+    elif roll < 0.85:  # 제목 칸
+        if not lying:
+            box(f"{name}_label", (w * 0.62, 0.0012, tall * 0.16), (0, -d / 2 - 0.0002, h * 0.66), m.ivory, parent=r, col=col)
+        else:
+            box(f"{name}_label", (tall * 0.3, 0.0012, across * 0.55), (0, -d / 2 - 0.0002, h / 2), m.ivory, parent=r, col=col)
+    return r
+
+
 def books(m, name, x0, x1, z, depth, col, root, seed):
     rng = np.random.default_rng(seed)
     x = x0
     while x < x1 - 0.03:
-        if rng.random() < 0.12 and x < x1 - 0.18:
-            x += rng.uniform(0.06, 0.14)  # 빈 틈
+        roll = rng.random()
+        if roll < 0.08 and x < x1 - 0.22:  # 눕혀 쌓은 두세 권
+            w = rng.uniform(0.15, 0.19)
+            zz = z
+            for k in range(int(rng.integers(2, 4))):
+                th = rng.uniform(0.022, 0.034)
+                _shelf_book(m, f"{name}_{x:.3f}_{k}", (x + w / 2, 0, zz), (w * rng.uniform(0.86, 1.0), depth * rng.uniform(0.75, 0.9), th),
+                            rng, root, col, lying=True)
+                zz += th
+            x += w + 0.012
+            continue
+        if roll < 0.18 and x < x1 - 0.18:
+            x += rng.uniform(0.06, 0.12)  # 빈 틈
             continue
         bw = rng.uniform(0.022, 0.045)
         bh = rng.uniform(0.15, 0.25)
         bd = depth * rng.uniform(0.75, 0.95)
-        mt = m.books[int(rng.integers(0, len(m.books)))]
-        b = box(f"{name}_{x:.3f}", (bw, bd, bh), (x + bw / 2, 0, z + bh / 2), mt, bevel=0.003, segments=2, parent=root, col=col)
-        if rng.random() < 0.08:
-            b.rotation_euler = (0, R(-12), 0)
-            b.location.z += 0.01
+        lean = R(-12) if rng.random() < 0.08 else 0.0
+        _shelf_book(m, f"{name}_{x:.3f}", (x + bw / 2, 0, z + (0.01 if lean else 0)), (bw, bd, bh), rng, root, col, lean=lean)
         x += bw + 0.002
 
 
@@ -261,17 +334,27 @@ def cabinet(m, name, loc, rotz, col, w=0.9, d=0.40, h=0.52):
 
 
 def armchair(m, name, loc, rotz, col):
+    """굵은 평직 천을 씌운 안락의자: 둥글게 만 팔걸이, 따로 얹은 좌석·등 쿠션, 황동 발끝."""
     root = _root(name, loc, rotz, col)
-    box(f"{name}_base", (0.86, 0.80, 0.22), (0, 0, 0.21), m.fabric_sage, bevel=0.05, parent=root, col=col)
-    box(f"{name}_cushion", (0.62, 0.66, 0.13), (0, -0.04, 0.38), m.fabric_sage, bevel=0.055, parent=root, col=col)
-    back = box(f"{name}_back", (0.86, 0.20, 0.50), (0, 0.31, 0.50), m.fabric_sage, bevel=0.07, parent=root, col=col)
-    back.rotation_euler = (R(-6), 0, 0)
+    f = m.armchair_fabric
+
+    def soft(part, size, at, bevel, rot=None):
+        ob = box(f"{name}_{part}", size, at, f, bevel=bevel, segments=5, parent=root, col=col, rot=rot)
+        return uv_box(ob, 0.05)
+
+    soft("base", (0.86, 0.80, 0.22), (0, 0, 0.21), 0.05)
+    soft("cushion", (0.60, 0.64, 0.14), (0, -0.05, 0.385), 0.06)
+    soft("back", (0.86, 0.18, 0.52), (0, 0.32, 0.52), 0.07, rot=(R(-6), 0, 0))
+    soft("back_cushion", (0.58, 0.12, 0.34), (0, 0.205, 0.62), 0.055, rot=(R(-10), 0, 0))
     for sx in (-1, 1):
-        box(f"{name}_arm_{sx}", (0.14, 0.78, 0.36), (sx * 0.37, 0.0, 0.40), m.fabric_sage, bevel=0.06, parent=root, col=col)
+        soft(f"arm_{sx}", (0.14, 0.78, 0.30), (sx * 0.37, 0.0, 0.36), 0.05)
+        uv_box(cyl(f"{name}_arm_roll_{sx}", 0.075, 0.80, (sx * 0.37, -0.005, 0.50), f, axis="Y", segments=32, bevel=0.02, parent=root, col=col), 0.05)
         for sy in (-1, 1):
             cone(f"{name}_leg_{sx}_{sy}", 0.016, 0.022, 0.10, (sx * 0.34, sy * 0.30, 0), m.wood_dark, segments=12, parent=root, col=col)
-    pillow = empty(f"part__{name}_pillow", (0.08, 0.17, 0.58), parent=root, col=col)
-    box(f"{name}_pillow_body", (0.36, 0.12, 0.30), (0, 0, 0), m.fabric, bevel=0.06, parent=pillow, col=col, rot=(R(-15), 0, R(8)))
+            cyl(f"{name}_toe_{sx}_{sy}", 0.0165, 0.012, (sx * 0.34, sy * 0.30, 0.006), m.brass, segments=12, parent=root, col=col)
+    pillow = empty(f"part__{name}_pillow", (0.10, 0.07, 0.61), parent=root, col=col)
+    uv_box(box(f"{name}_pillow_body", (0.36, 0.12, 0.30), (0, 0, 0), m.pillow_fabric, bevel=0.06, segments=5, parent=pillow, col=col,
+               rot=(R(-15), 0, R(8))), 0.05)
     return root
 
 

@@ -171,3 +171,41 @@ def skyline(w=1200, h=1280, night=False):
         lx, ly = tall[0] + tall[1] // 2, tall[2] + 4
         a[ly - 2:ly + 3, lx - 2:lx + 3, :3] = np.array([1.0, 0.25, 0.18]) * (0.5 if far else 0.9)
     return np.clip(a, 0, 1)
+
+
+def _srgb(x):
+    x = np.clip(x, 0, 1)
+    return np.where(x <= 0.0031308, 12.92 * x, 1.055 * x ** (1 / 2.4) - 0.055)
+
+
+def fabric(color, kind="weave", n=256, cells=8, strength=4.0, seed=1):
+    """이어 붙여도 이음매가 없는 직물 한 장: (바탕색 RGBA, 노멀 맵 RGBA).
+    weave는 굵은 평직(안락의자), mesh는 엇갈린 구멍이 있는 사무용 의자 메시다. color는 재질과 같은 선형 값이다."""
+    rng = np.random.default_rng(seed)
+    y, x = np.mgrid[0:n, 0:n] / n * cells
+    ix, iy = x.astype(int), y.astype(int)
+    fx, fy = x % 1, y % 1
+    if kind == "weave":
+        # 칸마다 세로실과 가로실이 번갈아 위로 올라온다
+        warp = np.sin(np.pi * fx) ** 0.7 * (0.75 + 0.25 * np.sin(np.pi * fy))
+        weft = np.sin(np.pi * fy) ** 0.7 * (0.75 + 0.25 * np.sin(np.pi * fx))
+        h = np.where((ix + iy) % 2 == 0, warp, weft)
+    else:
+        # 줄마다 반 칸씩 어긋난 구멍
+        gx = (x + 0.5 * (iy % 2)) % 1
+        h = np.clip((np.hypot(gx - 0.5, fy - 0.5) - 0.16) / 0.2, 0, 1)
+    # 보풀: 흐린 잡음(가장자리를 감아 계산해 타일 이음매가 없다)
+    r = rng.random((n, n))
+    for _ in range(2):
+        r = (r + np.roll(r, 1, 0) + np.roll(r, -1, 0) + np.roll(r, 1, 1) + np.roll(r, -1, 1)) / 5
+    h = h + 0.35 * (r - 0.5)
+    gx = (np.roll(h, -1, 1) - np.roll(h, 1, 1)) / 2 * strength
+    gy = (np.roll(h, -1, 0) - np.roll(h, 1, 0)) / 2 * strength
+    nrm = np.stack([-gx, -gy, np.ones_like(h)], -1)
+    nrm /= np.linalg.norm(nrm, axis=-1, keepdims=True)
+    normal = np.ones((n, n, 4), dtype=np.float32)
+    normal[..., :3] = nrm * 0.5 + 0.5
+    col = np.ones((n, n, 4), dtype=np.float32)
+    lo = 0.72 if kind == "weave" else 0.45  # 메시는 구멍이 더 어둡게 보인다
+    col[..., :3] = _srgb(np.array(color)[None, None, :] * (lo + (1.12 - lo) * np.clip(h, 0, 1))[..., None])
+    return col, normal

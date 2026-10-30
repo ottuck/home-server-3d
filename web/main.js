@@ -875,10 +875,29 @@ function setupToys(root) {
       } });
   }
 
-  const top = get("part__chair_top");
-  if (top) {
-    add({ label: "의자", pick: [get("prop__chair"), top].filter(Boolean), rate: 2.2,
-      click: (t) => (t.target += 2 * Math.PI), apply: (k) => (top.rotation.y = k) });
+  const top = get("part__chair_top"), base = get("prop__chair"), desk = get("prop__desk");
+  if (top && base && desk) {
+    // 책상에 바짝 붙어 있어 제자리에서 돌면 팔걸이·등받이가 책상을 뚫는다.
+    // 사람이 하듯 책상 반대쪽으로 빼고, 한 바퀴 돌린 뒤, 다시 밀어 넣는다. 러그 위로 가면 러그 두께만큼 뜬다.
+    const DUR = 2.6, PULL = 0.3; // 의자 윗부분 회전 반경 0.40m, 제자리에서 책상까지 0.34m → 0.3m 빼면 0.2m 남는다
+    const rest = [base, top].map((o) => o.position.clone());
+    const away = base.position.clone().sub(new THREE.Box3().setFromObject(desk).getCenter(new THREE.Vector3())).setY(0).normalize();
+    const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2);
+    const p = new THREE.Vector3();
+    let t0 = null; // 도는 중이면 시작 시각
+    add({ label: "의자", pick: [base, top], rate: 0,
+      click: () => (t0 ??= clock.getElapsedTime()), // 도는 중에 누르면 무시
+      apply: (_, t) => {
+        if (t0 === null) return;
+        const s = Math.min((t - t0) / DUR, 1);
+        if (s === 1) t0 = null; // 프레임이 띄엄띄엄 와도 마지막엔 꼭 제자리(s = 1)를 한 번 그린다
+        const out = PULL * (s < 0.5 ? ease(s / 0.25) : ease((1 - s) / 0.25)); // 앞 1/4에 빼고 뒤 1/4에 넣는다
+        top.rotation.y = 2 * Math.PI * ease((s - 0.2) / 0.6);
+        [base, top].forEach((o, i) => {
+          p.copy(rest[i]).addScaledVector(away, out);
+          o.position.set(p.x, rest[i].y + rugLift(p), p.z);
+        });
+      } });
   }
 
   const speaker = get("part__speaker");

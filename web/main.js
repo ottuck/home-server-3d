@@ -41,7 +41,7 @@ const THEMES = {
   },
   night: {
     bg: 0x1a2340, hemi: 0.10, sun: 0, env: 0.05, window: 0.6, lamps: true, rack: 1.2,
-    screen: 1.0, led: 14, bloom: [0.45, 0.3, 1.0],
+    screen: 1.0, led: 14, bloom: [0.28, 0.25, 1.5], // 밤 블룸은 빛나는 것만 살짝 번지게(벽이 뿌옇게 번지지 않게)
   },
 };
 
@@ -99,9 +99,9 @@ windowLight.target.position.copy(B(-0.4, -0.3, 0.2));
 // 밤 조명: 스탠드, 책상 등, 탁상등, 벽등(room.py 위치와 같다)
 const warm = 0xffb873;
 const lamps = [
-  [B(-1.36, -1.08, 1.42), 3.6, 6.5, true], // 스탠드: 방 전체를 밝히는 주 조명
+  [B(-1.36, -1.08, 1.42), 3.0, 6.5, true], // 스탠드: 방 전체를 밝히는 주 조명
   [B(-1.43, 0.58, 1.10), 0.7, 2.5, false],
-  [B(0.80, 1.20, 0.76), 0.9, 3.0, false],
+  [B(0.93, 1.20, 0.70), 0.9, 3.0, false],
   [B(-0.13, 1.31, 1.74), 0.9, 3.0, false],
 ].map(([pos, power, dist, shadow]) => {
   const l = new THREE.PointLight(warm, 0, dist, 1.6);

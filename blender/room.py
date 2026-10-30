@@ -73,7 +73,7 @@ def layout(m, night, col, rack_root, cable_mats):
     props.cabinet(m, "cabinet", (1.18, Y1 - 0.22, 0), 0, col)
     props.speaker(m, (1.18, Y1 - 0.22, 0.52), -8, col)
     props.plant(m, "plant_cabinet", (1.46, Y1 - 0.22, 0.52), col, height=0.2, pot=3, seed=8)
-    props.table_lamp(m, "table_lamp", (0.80, Y1 - 0.20, 0.52), col)
+    props.table_lamp(m, "table_lamp", (0.93, Y1 - 0.20, 0.52), col)  # 랙과 스피커 사이 가운데
     props.sconce(m, "sconce", (-0.13, Y1 - 0.021, 1.72), 0, col)
     props.cable_tray(m, "tray", X0 + 0.05, 0.42, Y1 - 0.12, 2.06, col, cable_mats)
     for k in range(4):
@@ -145,5 +145,5 @@ def lights(theme):
         shape="RECTANGLE", size=wx1 - wx0, size_y=wz1 - wz0)
     add("floor_lamp_light", "POINT", (-1.36, -1.08, 1.40), (0, 0, 0), t["floor_lamp"], warm, shadow_soft_size=0.12)
     add("desk_lamp_light", "POINT", (-1.43, 0.58, 1.10), (0, 0, 0), t["desk_lamp"], warm, shadow_soft_size=0.05)
-    add("table_lamp_light", "POINT", (0.80, Y1 - 0.20, 0.76), (0, 0, 0), t["table_lamp"], warm, shadow_soft_size=0.06)
+    add("table_lamp_light", "POINT", (0.93, Y1 - 0.20, 0.70), (0, 0, 0), t["table_lamp"], warm, shadow_soft_size=0.06)
     add("sconce_light", "POINT", (-0.13, Y1 - 0.09, 1.74), (0, 0, 0), t["sconce"], warm, shadow_soft_size=0.06)

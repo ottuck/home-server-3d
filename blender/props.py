@@ -63,6 +63,8 @@ class Mats:
         self.cream_vinyl = mat("speaker_wood", (0.36, 0.21, 0.11), rough=0.5)
         self.speaker_grille = self._fabric("speaker_grille", (0.66, 0.59, 0.46), "weave", 28, 8)
         self.akari = mat("akari_paper", (0.95, 0.92, 0.84), rough=0.9, emit=(1.0, 0.82, 0.60), strength=0.55 * glow)
+        self.linen_dark = self._fabric("lamp_linen", (0.10, 0.10, 0.10), "weave", 20, 9)
+        self.diffuser = mat("arc_diffuser", (0.95, 0.93, 0.88), rough=0.6, emit=(1.0, 0.82, 0.60), strength=1.5 * glow)
         self.wire = mat("black_wire", (0.03, 0.03, 0.035), rough=0.4, metal=0.6)
         self.keycap = mat("keycap_ivory", (0.86, 0.83, 0.75), rough=0.5)
         self.keycap_mod = mat("keycap_gray", (0.48, 0.47, 0.44), rough=0.5)
@@ -639,6 +641,31 @@ def rug(m, name, loc, col, w=1.7, d=1.15, seed=4):
             tassel.rotation_euler = (0, 0, rng.uniform(-0.12, 0.12))
     return root
 
+
+def arc_lamp(m, name, loc, reach, col):
+    """아크 플로어 스탠드: 무거운 검은 원형 받침, 곧게 올라가다 앞으로 휘어 넘어가는 검은 기둥,
+    끝에 매달린 짙은 회색 리넨 드럼 갓(아래는 흰 확산판). reach는 받침에서 갓 중심까지의 (dx, dy)다."""
+    root = _root(name, loc, 0, col)
+    dx, dy = reach
+    lathe(f"{name}_base", [(0, 0), (0.15, 0), (0.15, 0.018), (0.14, 0.035), (0.05, 0.045), (0.02, 0.05), (0, 0.05)], (0, 0, 0), m.charcoal,
+          parent=root, col=col)
+    top, shade_z = 1.72, 1.20  # 아치 꼭대기 높이, 갓 아래 끝 높이
+    tip = (dx, dy, top - 0.08)
+    cable(f"{name}_pole", [(0, 0, 0.04), (0, 0, 1.10), (dx * 0.12, dy * 0.12, top - 0.10), (dx * 0.55, dy * 0.55, top), tip], 0.011,
+          m.black_metal, parent=root, col=col)
+    cyl(f"{name}_joint", 0.016, 0.03, (0, 0, 1.10), m.black_metal, segments=16, parent=root, col=col)
+    cable(f"{name}_drop", [tip, (dx, dy, shade_z + 0.22)], 0.006, m.black_metal, parent=root, col=col)
+    shade = cone(f"{name}_shade", 0.20, 0.20, 0.22, (dx, dy, shade_z), m.linen_dark, segments=48, parent=root, col=col, caps=False)
+    uv_box(shade, 0.05)
+    cyl(f"{name}_diffuser", 0.192, 0.004, (dx, dy, shade_z + 0.02), m.diffuser, segments=48, parent=root, col=col)
+    cyl(f"{name}_cap", 0.20, 0.004, (dx, dy, shade_z + 0.218), m.linen_dark, segments=48, parent=root, col=col)
+    sphere(f"{name}_bulb", 0.03, (dx, dy, shade_z + 0.10), m.bulb, parent=root, col=col)
+    return root
+
+
+# ---------------------------------------------------------------- 보관: 지금 방에는 두지 않는 소품
+# 다시 쓰려면 room.layout에 한 줄 넣는다. 예) props.akari(m, "akari", (1.50, 0.10, 0), col)
+# (웹에서 켜고 끄려면 web/main.js SWITCHES·lamps·GLOW에 akari_paper를 다시 넣는다.) 모습은 docs/archive/akari.png.
 
 def akari(m, name, loc, col):
     """이사무 노구치 아카리풍 종이 조명: 가로 살이 비치는 달걀형 한지 갓, 가는 검은 철사 다리 셋과 위 손잡이.

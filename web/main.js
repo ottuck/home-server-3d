@@ -104,7 +104,7 @@ const lamps = [
   [B(-1.43, 0.58, 1.10), 0.7, 2.5, false],
   [B(0.93, 1.20, 0.70), 0.9, 3.0, false],
   [B(-0.13, 1.31, 1.74), 0.9, 3.0, false],
-  [B(1.25, -0.68, 1.15), 1.1, 3.0, false], // 안락의자 위 아크 스탠드(갓 바로 아래)
+  [B(1.25, -0.68, 1.27), 1.1, 3.0, false], // 안락의자 위 아크 스탠드(갓 안, 전구 아래)
 ].map(([pos, power, dist, shadow]) => {
   const l = new THREE.PointLight(warm, 0, dist, 1.9); // Cycles처럼 멀어질수록 빨리 어두워지게
   l.position.copy(pos);
@@ -570,7 +570,8 @@ const SWITCHES = [
 const GLOW = {
   lamp_shade: [1.0, 0.78, 0.50, 0.75, 0],
   rattan_shade: [1.0, 0.70, 0.40, 2.5, 0],
-  arc_diffuser: [1.0, 0.82, 0.60, 1.5, 0],
+  arc_lining: [1.0, 0.84, 0.62, 1.0, 0],
+  lamp_linen: [1.0, 0.62, 0.32, 0.12, 0],
   bulb: [1.0, 0.80, 0.55, 2.2, 0.3],
   sign_glow: [1.0, 0.72, 0.40, 2.2, 0],
 };

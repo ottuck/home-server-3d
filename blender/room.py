@@ -18,7 +18,7 @@ THEMES = {
     "day": dict(bg=(0.93, 0.91, 0.87), world=(0.82, 0.80, 0.76), world_strength=0.65, sun=2.6, fill=170.0, window=140.0,
                 window_color=(1.0, 0.93, 0.80), floor_lamp=0.0, desk_lamp=0.0, sconce=0.0, table_lamp=0.0, arc_lamp=0.0),
     "night": dict(bg=(0.025, 0.032, 0.065), world=(0.010, 0.016, 0.040), world_strength=0.30, sun=0.0, fill=0.0, window=18.0,
-                  window_color=(0.50, 0.62, 1.0), floor_lamp=55.0, desk_lamp=14.0, sconce=22.0, table_lamp=20.0, arc_lamp=26.0),
+                  window_color=(0.50, 0.62, 1.0), floor_lamp=55.0, desk_lamp=14.0, sconce=22.0, table_lamp=20.0, arc_lamp=38.0),
 }
 
 
@@ -146,7 +146,7 @@ def lights(theme):
     add("window_light", "AREA", ((wx0 + wx1) / 2, Y1 + 0.05, (wz0 + wz1) / 2), (-90, 0, 0), t["window"], t["window_color"],
         shape="RECTANGLE", size=wx1 - wx0, size_y=wz1 - wz0)
     add("floor_lamp_light", "POINT", (-1.36, -1.08, 1.40), (0, 0, 0), t["floor_lamp"], warm, shadow_soft_size=0.12)
-    add("arc_lamp_light", "POINT", (1.25, -0.68, 1.15), (0, 0, 0), t["arc_lamp"], warm, shadow_soft_size=0.08)
+    add("arc_lamp_light", "POINT", (1.25, -0.68, 1.27), (0, 0, 0), t["arc_lamp"], warm, shadow_soft_size=0.08)
     add("desk_lamp_light", "POINT", (-1.43, 0.58, 1.10), (0, 0, 0), t["desk_lamp"], warm, shadow_soft_size=0.05)
     add("table_lamp_light", "POINT", (0.93, Y1 - 0.20, 0.70), (0, 0, 0), t["table_lamp"], warm, shadow_soft_size=0.06)
     add("sconce_light", "POINT", (-0.13, Y1 - 0.09, 1.74), (0, 0, 0), t["sconce"], warm, shadow_soft_size=0.06)

@@ -63,8 +63,12 @@ class Mats:
         self.cream_vinyl = mat("speaker_wood", (0.36, 0.21, 0.11), rough=0.5)
         self.speaker_grille = self._fabric("speaker_grille", (0.66, 0.59, 0.46), "weave", 28, 8)
         self.akari = mat("akari_paper", (0.95, 0.92, 0.84), rough=0.9, emit=(1.0, 0.82, 0.60), strength=0.55 * glow)
-        self.linen_dark = self._fabric("lamp_linen", (0.10, 0.10, 0.10), "weave", 20, 9)
-        self.diffuser = mat("arc_diffuser", (0.95, 0.93, 0.88), rough=0.6, emit=(1.0, 0.82, 0.60), strength=1.5 * glow)
+        self.linen_dark = self._fabric("lamp_linen", (0.17, 0.14, 0.11), "weave", 20, 9)
+        # 켜면 짙은 리넨 사이로 빛이 은은하게 비친다(밤 렌더에서만 발광, 웹은 스위치가 켠다)
+        b = self.linen_dark.node_tree.nodes["Principled BSDF"]
+        b.inputs["Emission Color"].default_value = (1.0, 0.62, 0.32, 1.0)
+        b.inputs["Emission Strength"].default_value = 0.12 * glow
+        self.lining = mat("arc_lining", (0.96, 0.94, 0.90), rough=0.7, emit=(1.0, 0.84, 0.62), strength=1.0 * glow)
         self.wire = mat("black_wire", (0.03, 0.03, 0.035), rough=0.4, metal=0.6)
         self.keycap = mat("keycap_ivory", (0.86, 0.83, 0.75), rough=0.5)
         self.keycap_mod = mat("keycap_gray", (0.48, 0.47, 0.44), rough=0.5)
@@ -643,23 +647,31 @@ def rug(m, name, loc, col, w=1.7, d=1.15, seed=4):
 
 
 def arc_lamp(m, name, loc, reach, col):
-    """아크 플로어 스탠드: 무거운 검은 원형 받침, 곧게 올라가다 앞으로 휘어 넘어가는 검은 기둥,
-    끝에 매달린 짙은 회색 리넨 드럼 갓(아래는 흰 확산판). reach는 받침에서 갓 중심까지의 (dx, dy)다."""
+    """아크 플로어 스탠드: 황동 원형 받침, 곧게 올라가다 앞으로 휘어 넘어가는 검은 기둥,
+    끝에 매달린 짙은 토프색 리넨 드럼 갓. 갓은 위아래가 열려 있고 안쪽은 흰 안감이라, 켜면 위아래로 빛이 나오고
+    바깥 리넨으로도 빛이 은은하게 샌다. reach는 받침에서 갓 중심까지의 (dx, dy)다."""
     root = _root(name, loc, 0, col)
     dx, dy = reach
-    lathe(f"{name}_base", [(0, 0), (0.15, 0), (0.15, 0.018), (0.14, 0.035), (0.05, 0.045), (0.02, 0.05), (0, 0.05)], (0, 0, 0), m.charcoal,
+    lathe(f"{name}_base", [(0, 0), (0.12, 0), (0.12, 0.012), (0.11, 0.026), (0.04, 0.036), (0.016, 0.042), (0, 0.042)], (0, 0, 0), m.brass,
           parent=root, col=col)
-    top, shade_z = 1.72, 1.20  # 아치 꼭대기 높이, 갓 아래 끝 높이
+    top, shade_z, r, h = 1.70, 1.22, 0.16, 0.18  # 아치 꼭대기 높이, 갓 아래 끝 높이, 갓 반지름·높이
     tip = (dx, dy, top - 0.08)
-    cable(f"{name}_pole", [(0, 0, 0.04), (0, 0, 1.10), (dx * 0.12, dy * 0.12, top - 0.10), (dx * 0.55, dy * 0.55, top), tip], 0.011,
+    cable(f"{name}_pole", [(0, 0, 0.04), (0, 0, 1.10), (dx * 0.12, dy * 0.12, top - 0.10), (dx * 0.55, dy * 0.55, top), tip], 0.010,
           m.black_metal, parent=root, col=col)
-    cyl(f"{name}_joint", 0.016, 0.03, (0, 0, 1.10), m.black_metal, segments=16, parent=root, col=col)
-    cable(f"{name}_drop", [tip, (dx, dy, shade_z + 0.22)], 0.006, m.black_metal, parent=root, col=col)
-    shade = cone(f"{name}_shade", 0.20, 0.20, 0.22, (dx, dy, shade_z), m.linen_dark, segments=48, parent=root, col=col, caps=False)
+    cyl(f"{name}_joint", 0.015, 0.025, (0, 0, 1.10), m.brass, segments=16, parent=root, col=col)
+    cable(f"{name}_drop", [tip, (dx, dy, shade_z + h - 0.02)], 0.005, m.black_metal, parent=root, col=col)
+    cyl(f"{name}_socket", 0.018, 0.05, (dx, dy, shade_z + h - 0.045), m.brass, segments=16, parent=root, col=col)
+    # 갓 위쪽 고정 살: 소켓에서 갓 테두리로 가는 가는 막대 셋
+    for k in range(3):
+        a = R(90 + 120 * k)
+        cable(f"{name}_spoke_{k}", [(dx, dy, shade_z + h - 0.02), (dx + (r - 0.004) * math.cos(a), dy + (r - 0.004) * math.sin(a), shade_z + h - 0.006)],
+              0.0018, m.brass, parent=root, col=col)
+    shade = cone(f"{name}_shade", r, r, h, (dx, dy, shade_z), m.linen_dark, segments=56, parent=root, col=col, caps=False)
     uv_box(shade, 0.05)
-    cyl(f"{name}_diffuser", 0.192, 0.004, (dx, dy, shade_z + 0.02), m.diffuser, segments=48, parent=root, col=col)
-    cyl(f"{name}_cap", 0.20, 0.004, (dx, dy, shade_z + 0.218), m.linen_dark, segments=48, parent=root, col=col)
-    sphere(f"{name}_bulb", 0.03, (dx, dy, shade_z + 0.10), m.bulb, parent=root, col=col)
+    cone(f"{name}_lining", r - 0.004, r - 0.004, h - 0.004, (dx, dy, shade_z + 0.002), m.lining, segments=56, parent=root, col=col, caps=False)
+    for z in (shade_z - 0.003, shade_z + h - 0.003):  # 위아래 테두리 띠(속이 빈 고리라 빛을 막지 않는다)
+        cone(f"{name}_rim_{z:.2f}", r + 0.002, r + 0.002, 0.006, (dx, dy, z), m.brass, segments=56, parent=root, col=col, caps=False)
+    sphere(f"{name}_bulb", 0.028, (dx, dy, shade_z + 0.12), m.bulb, parent=root, col=col)  # 빛(점 조명)은 전구 아래 갓 안쪽
     return root
 
 

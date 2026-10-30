@@ -279,7 +279,7 @@ function applyTheme(name) {
   theme = name;
   const t = THEMES[name];
   document.body.classList.toggle("night", name === "night");
-  document.getElementById("theme").textContent = name === "day" ? "밤" : "낮";
+  for (const b of document.querySelectorAll("#theme button")) b.setAttribute("aria-pressed", b.dataset.theme === name);
   scene.background = new THREE.Color(t.bg);
   hemi.intensity = t.hemi;
   sun.intensity = t.sun;
@@ -302,10 +302,12 @@ const clockTheme = () => {
   const h = new Date().getHours();
   return h >= 6 && h < 18 ? "day" : "night";
 };
-document.getElementById("theme").onclick = () => {
-  autoTheme = false;
-  applyTheme(theme === "day" ? "night" : "day");
-};
+for (const b of document.querySelectorAll("#theme button")) {
+  b.onclick = () => {
+    autoTheme = false;
+    applyTheme(b.dataset.theme);
+  };
+}
 
 // ---------------------------------------------------------------- 오른쪽 패널
 

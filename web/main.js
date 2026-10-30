@@ -37,7 +37,7 @@ const PAN_MIN = B(-1.7, 1.4, 0.3), PAN_MAX = B(1.7, -1.4, 1.8);
 // blender/room.py THEMES의 조명을 three.js 조명으로 옮긴 값. 강도는 눈으로 맞췄다.
 const THEMES = {
   day: {
-    bg: 0xeee8df, hemi: 1.5, sun: 3.0, env: 0.6, window: 1.2, lamps: false, rack: 0,
+    bg: 0xeee8df, hemi: 1.5, sun: 3.0, env: 0.6, window: 1.2, lamps: true, rack: 0, // 처음 보는 사람에게도 아늑하게 낮에도 조명을 켜 둔다
     screen: 0.7, led: 7, bloom: [0.25, 0.3, 2.2],
   },
   night: {
@@ -220,6 +220,7 @@ function setupScene(gltf, nightSky) {
     scene.add(hit);
     desk.parts.push(hit);
   }
+  findOccluders(root); // 조명 스위치가 재질을 복제하기 전에(가림 소품의 재질을 먼저 따로 떼어 둔다)
   setupSwitches(root);
   setupRattanLight(root.getObjectByName("prop__table_lamp"));
   setupVacuum(root.getObjectByName("part__vacuum"));
@@ -417,6 +418,57 @@ function focusScreen(which) {
   $("panel").scrollTop = 0;
 }
 
+// 랙을 확대하면 카메라와 랙 사이에 선 소품(아크 스탠드 등)을 반투명하게 비켜 준다.
+// 랙 앞면 여러 점에서 카메라 쪽으로 광선을 쏴 걸리는 소품을 한 번 찾아 둔다.
+const occluders = [];
+let fade = 0;
+function findOccluders(root) {
+  const cands = root.children.filter((o) => /^(prop|part)__/.test(o.name) && o.name !== "prop__rug");
+  const box = new THREE.Box3().setFromObject(rack);
+  const r = new THREE.Raycaster();
+  const found = new Set();
+  for (let i = 0; i <= 6; i++) {
+    for (let j = 0; j <= 8; j++) {
+      const p = new THREE.Vector3(
+        THREE.MathUtils.lerp(box.min.x, box.max.x, i / 6),
+        THREE.MathUtils.lerp(box.min.y, box.max.y, j / 8),
+        box.max.z,
+      );
+      r.set(p, VIEW_DIR);
+      for (const h of r.intersectObjects(cands, true)) {
+        let o = h.object;
+        while (o.parent !== root) o = o.parent;
+        found.add(o);
+      }
+    }
+  }
+  for (const o of found) {
+    o.traverse((m) => {
+      if (!m.isMesh) return;
+      m.material = m.material.clone(); // 같은 재질을 쓰는 다른 소품까지 투명해지지 않게
+      m.userData.opacity = m.material.opacity;
+      m.userData.shadow = m.castShadow;
+    });
+    occluders.push(o);
+  }
+}
+const inOccluder = (obj) => { for (let o = obj; o; o = o.parent) if (occluders.includes(o)) return true; return false; };
+
+function stepFade(dt) {
+  const goal = focused ? 1 : 0;
+  if (fade === goal) return;
+  fade = Math.abs(goal - fade) < 0.01 ? goal : fade + (goal - fade) * Math.min(1, dt * 8);
+  for (const o of occluders) {
+    o.traverse((m) => {
+      if (!m.isMesh) return;
+      m.material.transparent = fade > 0 || m.userData.opacity < 1;
+      m.material.opacity = m.userData.opacity * (1 - 0.93 * fade);
+      m.material.depthWrite = fade < 0.5;
+      m.castShadow = fade < 0.5 && m.userData.shadow;
+    });
+  }
+}
+
 function home() {
   flyTo(TARGET.clone(), 1);
   focused = false;
@@ -563,7 +615,7 @@ const SWITCHES = [
   { node: "prop__desk", only: "bulb", label: "책상 스탠드", light: 1 },
   { node: "prop__table_lamp", label: "탁상등", light: 2 },
   { node: "prop__sconce", label: "벽등", light: 3 },
-  { node: "prop__arc_lamp", label: "아크 스탠드", light: 4 },
+  { node: "prop__arc_lamp", label: "아크 스탠드", light: 4, shape: true }, // 기둥이 랙 위로 휘어 넘어가 상자로 고르면 랙 앞을 덮는다
   { node: "prop__sign", label: "HOME LAB 간판" },
 ];
 // Blender에서 낮 테마로 내보내 빛이 꺼진 재질에 다시 줄 발광: [r, g, b, 켰을 때 세기, 껐을 때 세기]
@@ -599,10 +651,10 @@ function setupSwitches(root) {
       zone.expandByObject(o);
     });
     if (!s.only) zone.setFromObject(node);
-    // 가는 기둥이나 작은 전구도 누르기 쉽게 조금 넉넉한 투명 상자로 고른다
-    const hit = hitBox(zone, s.only ? 0.2 : 0.06);
-    scene.add(hit);
-    switches.push({ label: s.label, light: s.light, glow, hit, on: false, level: 0 });
+    // 가는 기둥이나 작은 전구도 누르기 쉽게 조금 넉넉한 투명 상자로 고른다(shape면 실제 모양으로)
+    const hit = s.shape ? node : hitBox(zone, s.only ? 0.2 : 0.06);
+    if (!s.shape) scene.add(hit);
+    switches.push({ label: s.label, light: s.light, node, glow, hit, on: false, level: 0 });
   }
 }
 
@@ -958,8 +1010,10 @@ function unitOf(obj) {
 }
 
 const inRack = (obj) => { for (let o = obj; o; o = o.parent) if (o === rack) return true; return false; };
-const pickables = () => [rack, ...(monitor?.parts ?? []), ...(desk?.parts ?? []), ...switches.map((s) => s.hit), ...toys.flatMap((t) => t.pick), vacuum?.node].filter(Boolean);
-const switchOf = (hit) => hit && switches.find((s) => s.hit === hit.object);
+// 랙 확대 중에는 비켜 준(반투명) 소품을 누를 수 없게 해 그 뒤의 장비가 눌리게 한다
+const pickables = () => [rack, ...(monitor?.parts ?? []), ...(desk?.parts ?? []), ...switches.filter((s) => !(focused && inOccluder(s.node))).map((s) => s.hit),
+  ...toys.flatMap((t) => t.pick).filter((o) => !(focused && inOccluder(o))), vacuum?.node].filter(Boolean);
+const switchOf = (hit) => hit && switches.find((s) => { for (let o = hit.object; o; o = o.parent) if (o === s.hit) return true; return false; });
 const onParts = (hit, s) => !!hit && !!s && s.parts.some((p) => { for (let o = hit.object; o; o = o.parent) if (o === p) return true; return false; });
 const onMonitor = (hit) => onParts(hit, monitor);
 const onDesk = (hit) => onParts(hit, desk);
@@ -1026,6 +1080,7 @@ let lastT = 0;
 renderer.setAnimationLoop(() => {
   const t = clock.getElapsedTime();
   stepSwitches(t - lastT);
+  stepFade(t - lastT);
   stepToys(t - lastT, t);
   stepVacuum(t);
   const base = THEMES[theme].led;

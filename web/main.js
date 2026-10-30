@@ -295,6 +295,27 @@ function applyTheme(name) {
     skyline.material.needsUpdate = true;
   }
   [bloom.strength, bloom.radius, bloom.threshold] = t.bloom;
+  warmShaders();
+}
+
+// 셰이더는 처음 그릴 때 만들어지는데, 그동안 화면이 멈춘다(랙을 처음 확대할 때 1초 넘게 멈췄다).
+// 장면 전체와, 랙을 확대하면 반투명해지는 소품의 셰이더를 백그라운드에서 미리 만들어 둔다.
+// 조명 구성(테마)이 바뀌면 셰이더도 달라지므로 테마를 정할 때마다 한다.
+function warmShaders() {
+  if (fade > 0) return; // 소품이 이미 반투명한 중이면 건드리지 않는다
+  const faded = [];
+  for (const o of occluders) o.traverse((m) => m.isMesh && faded.push([m.material, m.material.transparent]));
+  for (const [m] of faded) m.transparent = true;
+  // RenderPass는 화면이 아니라 composer 버퍼에 그린다. 톤 매핑·색 공간이 셰이더에 들어가므로 같은 대상으로 만든다.
+  const target = renderer.getRenderTarget();
+  renderer.setRenderTarget(composer.readBuffer);
+  renderer.compileAsync(scene, camera).catch(() => {});
+  renderer.setRenderTarget(target);
+  // compile은 지금 바로 셰이더를 고르므로 곧장 되돌려도 된다. 되돌린 뒤에는 원래 셰이더를 다시 고르게 한다.
+  for (const [m, was] of faded) {
+    m.transparent = was;
+    m.needsUpdate = true;
+  }
 }
 // 방문자 현지 시각으로 낮(06~18시)·밤을 고르고 1분마다 다시 본다. 버튼을 누르면 그 뒤로는 자동 전환을 멈춘다.
 let autoTheme = true;
@@ -323,17 +344,9 @@ function renderPanel() {
   $("overall").innerHTML = `<i class="dot ${overall}"></i><b>${STATUS_LABEL[overall]}</b> · ${source} · ${when}`;
 
   const host = status?.host ?? {};
+  // 차트·커밋 목록은 데이터가 올 때 미리 그려 두고, 화면을 누르면 보이기만 한다(카메라가 움직이는 첫 프레임을 가볍게).
   $("charts").hidden = screenFocus !== "grafana";
-  if (screenFocus === "grafana") {
-    $("charts-src").textContent = !history?.start ? "" : history.demo ? "예시 데이터" : "1분 간격";
-    $("chart-list").innerHTML = chartsHTML(history);
-  }
-
   $("commits").hidden = screenFocus !== "desk";
-  if (screenFocus === "desk") {
-    $("commits-src").textContent = !github?.commits?.length ? "" : github.demo ? "예시 데이터" : "공개 저장소";
-    $("commit-list").innerHTML = commitsHTML(github);
-  }
 
   $("metrics").innerHTML = [["CPU", host.cpu], ["메모리", host.mem], ["디스크", host.disk]].map(([k, v]) => {
     const ok = Number.isFinite(v);
@@ -1006,13 +1019,15 @@ function paintLeds() {
 async function refreshHistory() {
   history = await fetchHistory();
   paintMonitor();
-  if (screenFocus === "grafana") renderPanel();
+  $("charts-src").textContent = !history?.start ? "" : history.demo ? "예시 데이터" : "1분 간격";
+  $("chart-list").innerHTML = chartsHTML(history);
 }
 
 async function refreshGithub() {
   github = await fetchGithub();
   paintDesk();
-  if (screenFocus === "desk") renderPanel();
+  $("commits-src").textContent = !github?.commits?.length ? "" : github.demo ? "예시 데이터" : "공개 저장소";
+  $("commit-list").innerHTML = commitsHTML(github);
 }
 
 async function refresh() {

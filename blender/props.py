@@ -607,14 +607,21 @@ def _bent_leg(name, material, angle, parent, col, reach=0.17, inner=0.06, top=0.
     return ob
 
 
-def side_table(m, name, loc, col):
-    """책과 컵을 올린 알토 스툴: 둥근 좌판과 구부린 합판 다리 네 개."""
+def side_table(m, name, loc, col, read_yaw=0.0):
+    """책과 컵을 올린 알토 스툴: 둥근 좌판과 구부린 합판 다리 네 개.
+    read_yaw는 읽는 사람이 앉은 방향(도)이다. 책은 등이 읽는 사람 왼쪽에 오도록 돌리고,
+    표지가 왼쪽으로 펼쳐질 자리(좌판 안)를 비워 두고 컵은 읽는 사람 앞쪽에 둔다."""
     root = _root(name, loc, 0, col)
     cyl(f"{name}_top", 0.21, 0.035, (0, 0, 0.50), m.wood, segments=48, bevel=0.01, parent=root, col=col)
     for i in range(4):
         _bent_leg(f"{name}_leg_{i}", m.wood, R(45 + 90 * i), root, col)
-    mug(m, f"{name}_mug", (0.10, -0.10, 0.518), root, col, material=m.pots[2])
-    books_root = empty(f"{name}_books", (-0.09, 0.04, 0.518), parent=root, col=col)
+    a = R(read_yaw)
+    u = (math.cos(a), math.sin(a))  # 책 +X(등과 펼친 표지 쪽) = 읽는 사람의 왼쪽
+    v = (-math.sin(a), math.cos(a))  # 책 +Y = 읽는 사람 쪽
+    # 아래 책 왼끝(-0.10)부터 펼친 표지 끝(+0.255)까지를 좌판 가운데에 둔다
+    mug(m, f"{name}_mug", (0.14 * v[0], 0.14 * v[1], 0.518), root, col, material=m.pots[2])
+    books_root = empty(f"{name}_books", (-0.0775 * u[0], -0.0775 * u[1], 0.518), parent=root, col=col)
+    books_root.rotation_euler = (0, 0, a)
     box(f"{name}_book_a", (0.20, 0.14, 0.025), (0, 0, 0.0125), m.books[3], bevel=0.003, parent=books_root, col=col)
     book(m, f"{name}_book_b", (0, 0, 0.025), (0.17, 0.125, 0.022), m.books[1], books_root, col)
     return root

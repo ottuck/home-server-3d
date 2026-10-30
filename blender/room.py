@@ -96,7 +96,7 @@ def layout(m, night, col, rack_root, cable_mats):
     props.armchair(m, "armchair", (1.25, -0.70, 0), -58, col)
     # 아크 스탠드: 받침은 안락의자 등받이 뒤, 갓은 좌석 위로 넘어온다
     props.arc_lamp(m, "arc_lamp", (1.58, -0.10, 0), (-0.33, -0.58), col)
-    props.side_table(m, "side_table", (0.62, -1.12, 0), col)
+    props.side_table(m, "side_table", (0.62, -1.12, 0), col, read_yaw=-58)  # 안락의자(-58°)에 앉아 읽는 방향
     # 로봇 청소기는 창 아래 충전대에 붙어 있다가 웹에서 방을 돈다
     props.dock(m, "dock", (-0.62, Y1 - 0.12, 0), 0, col)
     props.vacuum(m, (-0.62, Y1 - 0.405, 0), col)

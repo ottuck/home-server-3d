@@ -169,7 +169,7 @@ let github = null;
 let rack = null;
 let infra = null;
 let status = null;
-globalThis.viewer = { leds, units, mats, scene, camera, renderer, get status() { return status; }, get vacuum() { return vacuum; }, get switches() { return switches; }, get toys() { return toys; } }; // 콘솔 디버깅용
+globalThis.viewer = { leds, units, mats, scene, camera, renderer, controls, get status() { return status; }, get vacuum() { return vacuum; }, get switches() { return switches; }, get toys() { return toys; } }; // 콘솔 디버깅용
 
 function setupScene(gltf, nightSky) {
   const root = gltf.scene;
@@ -857,9 +857,12 @@ function setupToys(root) {
   if (cover) {
     const hit = hitBox(new THREE.Box3().setFromObject(cover).expandByVector(new THREE.Vector3(0, 0.03, 0)), 0.05);
     scene.add(hit);
-    // 덮개는 등(+X 모서리)을 축으로 넘어가 책 오른쪽에 눕는다
+    // 덮개는 등을 축으로 넘어가 책 왼쪽(안락의자에서 볼 때)에 눕는다. 책은 blender/room.py side_table의 read_yaw(-58°)만큼 돌아 있어
+    // 등 축(책의 Blender Y)도 같이 돈다: Blender (-sin a, cos a, 0) → three (-sin a, 0, -cos a)
+    const yaw = THREE.MathUtils.degToRad(-58);
+    const axis = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
     add({ label: "책", pick: [hit], rate: 5, click: flip,
-      apply: (k) => (cover.rotation.z = -k * THREE.MathUtils.degToRad(172)) });
+      apply: (k) => cover.quaternion.setFromAxisAngle(axis, k * THREE.MathUtils.degToRad(172)) });
   }
 
   const pillow = get("part__armchair_pillow"), armchair = get("prop__armchair");

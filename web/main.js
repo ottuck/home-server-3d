@@ -104,7 +104,7 @@ const lamps = [
   [B(-1.43, 0.58, 1.10), 0.7, 2.5, false],
   [B(0.93, 1.20, 0.70), 0.9, 3.0, false],
   [B(-0.13, 1.31, 1.74), 0.9, 3.0, false],
-  [B(1.60, -0.22, 0.62), 0.8, 2.6, false], // 안락의자 뒤 아카리
+  [B(1.50, 0.10, 0.42), 0.8, 2.6, false], // 안락의자 뒤 아카리
 ].map(([pos, power, dist, shadow]) => {
   const l = new THREE.PointLight(warm, 0, dist, 1.9); // Cycles처럼 멀어질수록 빨리 어두워지게
   l.position.copy(pos);

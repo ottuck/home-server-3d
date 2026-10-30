@@ -94,7 +94,7 @@ def layout(m, night, col, rack_root, cable_mats):
     # 가운데·앞: 러그, 안락의자, 협탁, 고양이, 화분
     props.rug(m, "rug", (0.15, -0.42, 0), col)
     props.armchair(m, "armchair", (1.25, -0.70, 0), -58, col)
-    props.akari(m, "akari", (1.60, -0.22, 0), col)  # 안락의자 등받이 뒤
+    props.akari(m, "akari", (1.50, 0.10, 0), col)  # 안락의자 등받이 뒤쪽, 의자와 수납장 사이 빈 바닥
     props.side_table(m, "side_table", (0.62, -1.12, 0), col)
     # 로봇 청소기는 창 아래 충전대에 붙어 있다가 웹에서 방을 돈다
     props.dock(m, "dock", (-0.62, Y1 - 0.12, 0), 0, col)
@@ -145,7 +145,7 @@ def lights(theme):
     add("window_light", "AREA", ((wx0 + wx1) / 2, Y1 + 0.05, (wz0 + wz1) / 2), (-90, 0, 0), t["window"], t["window_color"],
         shape="RECTANGLE", size=wx1 - wx0, size_y=wz1 - wz0)
     add("floor_lamp_light", "POINT", (-1.36, -1.08, 1.40), (0, 0, 0), t["floor_lamp"], warm, shadow_soft_size=0.12)
-    add("akari_light", "POINT", (1.60, -0.22, 0.60), (0, 0, 0), t["akari"], warm, shadow_soft_size=0.10)
+    add("akari_light", "POINT", (1.50, 0.10, 0.40), (0, 0, 0), t["akari"], warm, shadow_soft_size=0.10)
     add("desk_lamp_light", "POINT", (-1.43, 0.58, 1.10), (0, 0, 0), t["desk_lamp"], warm, shadow_soft_size=0.05)
     add("table_lamp_light", "POINT", (0.93, Y1 - 0.20, 0.70), (0, 0, 0), t["table_lamp"], warm, shadow_soft_size=0.06)
     add("sconce_light", "POINT", (-0.13, Y1 - 0.09, 1.74), (0, 0, 0), t["sconce"], warm, shadow_soft_size=0.06)

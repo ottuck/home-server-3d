@@ -60,8 +60,8 @@ class Mats:
         self.vacuum_led = mat("vacuum_led", (0.30, 1.0, 0.55), rough=0.3, emit=(0.30, 1.0, 0.55), strength=4.0)
         self.blind = mat("blind", (0.93, 0.91, 0.86), rough=0.6)
         self.rattan = self._rattan(glow)
-        self.cream_vinyl = mat("speaker_cream", (0.78, 0.72, 0.60), rough=0.55)
-        self.speaker_grille = self._fabric("speaker_grille", (0.70, 0.64, 0.50), "weave", 28, 8)
+        self.cream_vinyl = mat("speaker_wood", (0.36, 0.21, 0.11), rough=0.5)
+        self.speaker_grille = self._fabric("speaker_grille", (0.66, 0.59, 0.46), "weave", 28, 8)
         self.akari = mat("akari_paper", (0.95, 0.92, 0.84), rough=0.9, emit=(1.0, 0.82, 0.60), strength=0.55 * glow)
         self.wire = mat("black_wire", (0.03, 0.03, 0.035), rough=0.4, metal=0.6)
         self.keycap = mat("keycap_ivory", (0.86, 0.83, 0.75), rough=0.5)
@@ -642,9 +642,9 @@ def rug(m, name, loc, col, w=1.7, d=1.15, seed=4):
 
 def akari(m, name, loc, col):
     """이사무 노구치 아카리풍 종이 조명: 가로 살이 비치는 달걀형 한지 갓, 가는 검은 철사 다리 셋과 위 손잡이.
-    안락의자 등받이 위로 보이도록 다리를 길게 했다."""
+    다리는 짧게 해 갓 아래가 바닥에서 28cm 뜬다."""
     root = _root(name, loc, 0, col)
-    legs, z0, h, seg, rows, ribs = 0.48, 0.48, 0.34, 48, 60, 14
+    z0, h, seg, rows, ribs = 0.28, 0.34, 48, 60, 14
     verts, faces = [], []
     for j in range(rows + 1):
         t = j / rows
@@ -780,7 +780,7 @@ def wall_screen(m, name, loc, rotz, col, img, label, w=0.96, h=0.56):
 
 
 def speaker(m, loc, rotz, col):
-    """수납장 위 가로형 블루투스 스피커(마셜 액톤 느낌): 크림색 몸통, 크림·금빛 짠 그릴, 테두리 띠,
+    """수납장 위 가로형 블루투스 스피커(마셜 스탠모어 브라운 느낌): 호두나무 빛 몸통, 베이지 짠 그릴, 테두리 띠,
     윗면 앞쪽 황동 조작판과 손잡이 넷. 웹에서 누르면 음악에 맞춰 들썩이는 부분(part__)이다."""
     root = empty("part__speaker", loc, col=col)
     root.rotation_euler = (0, 0, R(rotz))
@@ -789,7 +789,7 @@ def speaker(m, loc, rotz, col):
     grille = box("speaker_grille", (w - 0.03, 0.006, h - 0.04), (0, -d / 2 - 0.001, h / 2 + 0.002), m.speaker_grille, bevel=0.003,
                  parent=root, col=col)
     uv_box(grille, 0.03)
-    box("speaker_piping", (w - 0.022, 0.004, h - 0.032), (0, -d / 2 + 0.001, h / 2 + 0.002), m.ivory, bevel=0.004, parent=root, col=col)
+    box("speaker_piping", (w - 0.022, 0.004, h - 0.032), (0, -d / 2 + 0.001, h / 2 + 0.002), m.brass, bevel=0.004, parent=root, col=col)
     box("speaker_badge", (0.05, 0.003, 0.012), (0, -d / 2 - 0.0045, h * 0.72), m.brass, bevel=0.001, parent=root, col=col)
     box("speaker_panel", (w * 0.62, 0.035, 0.004), (0, -d / 2 + 0.025, h + 0.007), m.brass, bevel=0.0015, parent=root, col=col)
     for k in range(4):

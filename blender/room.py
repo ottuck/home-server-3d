@@ -56,7 +56,7 @@ def shell(m, night, col):
         ("win_mullion_v", (0.025, 0.03, wz1 - wz0), (cx, wy, cz)),
         ("win_mullion_h", (wx1 - wx0, 0.03, 0.025), (cx, wy, wz0 + (wz1 - wz0) * 0.62)),
     ]:
-        box(nm, size, loc, m.wood, bevel=0.004, col=col)
+        box(nm, size, loc, m.white_plastic, bevel=0.004, col=col)
     box("win_sill", (wx1 - wx0 + 0.10, 0.20, 0.035), (cx, Y1 - 0.03, wz0 - 0.0175), m.wood, bevel=0.008, col=col)
     # 창밖 풍경
     sky = image("skyline_night" if night else "skyline_day", 1200, 1280, tx.skyline(night=night))

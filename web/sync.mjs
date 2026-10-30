@@ -18,7 +18,7 @@ for (const [src, dst] of [
   console.log(`${src} -> web/data/${dst}`);
 }
 
-// 공개 웹에는 실제 호스트 이름(host.id)과 cAdvisor 라벨(source)을 싣지 않는다.
+// 공개 웹에는 실제 호스트 이름(host.id)과 cAdvisor 라벨(source)을 싣지 않는다. 지금은 infra.json에도 없지만 혹시 몰라 뺀다.
 const infra = JSON.parse(readFileSync(join(root, "shared/infra.json"), "utf8"));
 delete infra.$comment;
 delete infra.host.id;

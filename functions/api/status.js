@@ -11,10 +11,18 @@ const STALE = 180; // 초. 스크레이프 간격이 60초라 마지막 지표�
 const RESTART_WINDOW = 600; // 초. 최근 10분 안에 (재)시작했으면 주의.
 const MEM_WARN = 0.9; // 메모리 한도 대비 사용률. (container_oom_events_total은 이 서버에서 믿을 수 없어 쓰지 않는다)
 
-// source(cAdvisor container 라벨) → 공개 id
-const SOURCE_TO_ID = new Map(
-  infra.units.flatMap((u) => (u.containers ?? []).map((c) => [c.source, c.id])),
-);
+// cAdvisor container 라벨 → 공개 id. 라벨은 공개 저장소에 두지 않고 Secret CONTAINER_SOURCES({공개 id: 라벨} JSON)로 받는다.
+// infra.json에 있는 공개 id만 쓴다.
+const PUBLIC_IDS = new Set(infra.units.flatMap((u) => (u.containers ?? []).map((c) => c.id)));
+let sourceToId = null;
+function sources(env) {
+  if (sourceToId) return sourceToId;
+  const map = JSON.parse(env.CONTAINER_SOURCES || "{}");
+  const pairs = Object.entries(map).filter(([id, label]) => PUBLIC_IDS.has(id) && typeof label === "string").map(([id, label]) => [label, id]);
+  if (!pairs.length) console.error("CONTAINER_SOURCES is missing or empty");
+  else sourceToId = new Map(pairs);
+  return new Map(pairs);
+}
 
 // 한 번의 요청으로 모든 신호를 받는다.
 const QUERY = [
@@ -63,7 +71,7 @@ async function buildStatus(env) {
   if (hostSeen > STALE) return { updatedAt, containers: {}, host: {} };
 
   const containers = {};
-  for (const [source, id] of SOURCE_TO_ID) {
+  for (const [source, id] of sources(env)) {
     containers[id] = judge(signals.get(source));
   }
   return { updatedAt, containers, host };

@@ -2,3 +2,5 @@
 GRAFANA_PROM_URL=https://prometheus-prod-41-prod-au-southeast-1.grafana.net/api/prom
 GRAFANA_PROM_USER=3692523
 GRAFANA_PROM_TOKEN=glc_...
+# 공개 컨테이너 id → 실제 cAdvisor container 라벨(JSON 한 줄)
+CONTAINER_SOURCES={"edge-caddy":"<cAdvisor container 라벨>"}

@@ -68,6 +68,8 @@ class Mats:
         b = self.linen_dark.node_tree.nodes["Principled BSDF"]
         b.inputs["Emission Color"].default_value = (1.0, 0.62, 0.32, 1.0)
         b.inputs["Emission Strength"].default_value = 0.12 * glow
+        # 갓 바닥 젖빛 확산판: 위에서 내려다볼 때 뚫린 바닥으로 뒤가 비쳐 갓이 투명해 보이지 않게 막고, 켜면 은은히 빛난다
+        self.diffuser = mat("arc_diffuser", (0.95, 0.93, 0.88), rough=0.6, emit=(1.0, 0.66, 0.38), strength=1.0 * glow)
         self.lining = mat("arc_lining", (0.96, 0.94, 0.90), rough=0.7, emit=(1.0, 0.68, 0.40), strength=0.7 * glow)
         self.wire = mat("black_wire", (0.03, 0.03, 0.035), rough=0.4, metal=0.6)
         self.keycap = mat("keycap_ivory", (0.86, 0.83, 0.75), rough=0.5)
@@ -506,6 +508,7 @@ def _shelf_book(m, name, loc, size, rng, root, col, lean=0.0, lying=False):
 def books(m, name, x0, x1, z, depth, col, root, seed):
     rng = np.random.default_rng(seed)
     x = x0
+    upright = 0  # 세운 책 네 권에 한 권은 웹에서 눌러 꺼냈다 넣는 부품(part__)으로 뗀다
     while x < x1 - 0.03:
         roll = rng.random()
         if roll < 0.08 and x < x1 - 0.22:  # 눕혀 쌓은 두세 권
@@ -525,7 +528,12 @@ def books(m, name, x0, x1, z, depth, col, root, seed):
         bh = rng.uniform(0.15, 0.25)
         bd = depth * rng.uniform(0.75, 0.95)
         lean = R(-12) if rng.random() < 0.08 else 0.0
-        _shelf_book(m, f"{name}_{x:.3f}", (x + bw / 2, 0, z + (0.01 if lean else 0)), (bw, bd, bh), rng, root, col, lean=lean)
+        at, parent = (x + bw / 2, 0, z + (0.01 if lean else 0)), root
+        if not lean:
+            upright += 1
+            if upright % 4 == 2:
+                parent, at = empty(f"part__{name}_{upright}", at, parent=root, col=col), (0, 0, 0)
+        _shelf_book(m, f"{name}_{x:.3f}", at, (bw, bd, bh), rng, parent, col, lean=lean)
         x += bw + 0.002
 
 
@@ -673,6 +681,8 @@ def arc_lamp(m, name, loc, reach, col):
     for z in (shade_z - 0.003, shade_z + h - 0.003):  # 위아래 테두리 띠(속이 빈 고리라 빛을 막지 않는다)
         cone(f"{name}_rim_{z:.2f}", r + 0.002, r + 0.002, 0.006, (dx, dy, z), m.brass, segments=56, parent=root, col=col, caps=False)
     sphere(f"{name}_bulb", 0.028, (dx, dy, shade_z + 0.12), m.bulb, parent=root, col=col)  # 빛(점 조명)은 전구 아래 갓 안쪽
+    disc = cyl(f"{name}_diffuser", r - 0.005, 0.003, (dx, dy, shade_z + 0.006), m.diffuser, segments=56, parent=root, col=col)
+    disc.visible_shadow = False  # Cycles에서도 아래로 나가는 빛을 막지 않는다
     return root
 
 

@@ -38,11 +38,11 @@ const PAN_MIN = B(-1.7, 1.4, 0.3), PAN_MAX = B(1.7, -1.4, 1.8);
 const THEMES = {
   day: {
     bg: 0xeee8df, hemi: 1.5, sun: 3.0, env: 0.6, window: 1.2, lamps: true, rack: 0, // 처음 보는 사람에게도 아늑하게 낮에도 조명을 켜 둔다
-    screen: 0.7, led: 7, bloom: [0.25, 0.3, 2.2],
+    screen: 0.7, led: 7, bloom: [0.25, 0.3, 2.2], glow: 1.8, // 햇빛에 묻히지 않게 켠 갓·전구를 더 밝게
   },
   night: {
     bg: 0x1a2340, hemi: 0.07, sun: 0, env: 0.04, window: 0.6, lamps: true, rack: 1.2,
-    screen: 1.0, led: 14, bloom: [0.22, 0.3, 1.6], // 밤 블룸은 빛나는 것만 살짝 번지게(벽이 뿌옇게 번지지 않게)
+    screen: 1.0, led: 14, bloom: [0.22, 0.3, 1.6], glow: 1, // 밤 블룸은 빛나는 것만 살짝 번지게(벽이 뿌옇게 번지지 않게)
   },
 };
 
@@ -623,6 +623,7 @@ const GLOW = {
   lamp_shade: [1.0, 0.64, 0.34, 0.5, 0],
   rattan_shade: [1.0, 0.62, 0.30, 1.8, 0],
   arc_lining: [1.0, 0.66, 0.38, 0.7, 0],
+  arc_diffuser: [1.0, 0.66, 0.38, 1.0, 0],
   lamp_linen: [1.0, 0.58, 0.28, 0.12, 0],
   bulb: [1.0, 0.68, 0.40, 1.5, 0.3],
   sign_glow: [1.0, 0.72, 0.40, 2.2, 0],
@@ -664,7 +665,7 @@ function stepSwitches(dt) {
     s.level += (+s.on - s.level) * k;
     for (const m of s.glow) {
       const [, , , on, off] = GLOW[m.name];
-      m.emissiveIntensity = off + (on - off) * s.level;
+      m.emissiveIntensity = off + (on * THEMES[theme].glow - off) * s.level;
     }
     if (s.light != null) lamps[s.light].intensity = lamps[s.light].userData.power * s.level;
     // 라탄 갓의 빛 무늬: 밤에는 또렷하게, 낮에는 햇빛에 묻혀 옅게
@@ -886,6 +887,13 @@ function setupToys(root) {
           nextNote = t + 0.45 + Math.random() * 0.35;
         }
       } });
+  }
+
+  // 책장 책: 누르면 등 쪽(방 안, +X)으로 살짝 빠져나왔다가 제자리로 미끄러져 들어간다(임계 감쇠라 튕기지 않는다)
+  for (const o of root.children) {
+    if (!/^part__shelf_\w+_book_\d+$/.test(o.name)) continue;
+    const rest = o.position.x;
+    add({ label: "책", pick: [o], spring: [9, 6], click: (t) => (t.vel = 8), apply: (k) => (o.position.x = rest + 0.07 * Math.max(k, 0)) });
   }
 
   // 화분: 누르면 바닥을 축으로 살짝 흔들리다 멈춘다. 흔들리는 방향은 화분마다 다르다.

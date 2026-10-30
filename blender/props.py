@@ -35,6 +35,10 @@ class Mats:
         self.books = [mat(f"book_{i}", c, rough=0.7) for i, c in enumerate([
             (0.42, 0.52, 0.40), (0.82, 0.76, 0.62), (0.62, 0.30, 0.18), (0.12, 0.20, 0.35),
             (0.78, 0.58, 0.22), (0.25, 0.25, 0.27), (0.70, 0.66, 0.58), (0.35, 0.22, 0.15)])]
+        self.stone = mat("pot_stone", (0.66, 0.60, 0.51), rough=0.75)
+        self.ficus = [mat("ficus_leaf_a", (0.045, 0.15, 0.04), rough=0.45), mat("ficus_leaf_b", (0.08, 0.22, 0.06), rough=0.45),
+                      mat("ficus_leaf_c", (0.13, 0.30, 0.08), rough=0.5)]
+        self.bark = mat("bark", (0.26, 0.19, 0.12), rough=0.9)
         self.pages = mat("book_pages", (0.86, 0.82, 0.71), rough=0.85)
         self.armchair_fabric = self._fabric("armchair_fabric", (0.40, 0.50, 0.38), "weave", 8, 3)
         self.pillow_fabric = self._fabric("pillow_fabric", (0.66, 0.60, 0.50), "weave", 10, 4)
@@ -63,10 +67,10 @@ def _root(name, loc, rotz, col):
 
 # ---------------------------------------------------------------- 식물
 
-def _leaf(name, length, width, elev, droop, yaw, base, material, root, col, twist=0.0):
+def _leaf(name, length, width, elev, droop, yaw, base, material, root, col, twist=0.0, n=14):
     """잎 한 장: 가장 넓은 곳이 아래쪽 40%쯤인 뾰족한 잎. 가운데 잎맥을 따라 살짝 V자로 접히고,
     가장자리는 아래로 말리며, 끝으로 갈수록 처지고 비틀린다."""
-    n, across = 14, (-1.0, -0.5, 0.0, 0.5, 1.0)
+    across = (-1.0, -0.5, 0.0, 0.5, 1.0)
     verts, faces = [], []
     for i in range(n + 1):
         t = i / n
@@ -138,6 +142,40 @@ def plant(m, name, loc, col, height=1.0, pot=0, seed=1, rotz=0, reach=1.0):
         _leaf(f"{name}_leaf_{i}", rng.uniform(0.10, 0.17) * size, rng.uniform(0.045, 0.07) * (0.7 + 0.5 * height),
               R(rng.uniform(20, 60)), rng.uniform(1.0, 3.0) / (0.6 + height), yaw, (bx, by, stem_h),
               m.leaf[int(rng.integers(0, 3))], root, col, twist=rng.uniform(-0.5, 0.5))
+    return root
+
+
+def ficus(m, name, loc, col, seed=1):
+    """벤자민 고무나무(외대 수형): 키 큰 석재 화분, 곧은 줄기, 위쪽의 둥글고 촘촘한 잎 덩어리.
+    웹에서 누르면 흔들리므로 화분 바닥 중심을 축으로 하는 부분(part__)이다."""
+    rng = np.random.default_rng(seed)
+    root = _root(f"part__{name}", loc, 0, col)
+    pr, ph = 0.16, 0.42
+    lathe(f"{name}_pot", [(0, 0), (pr * 0.82, 0), (pr * 0.9, 0.012), (pr * 0.97, ph * 0.5), (pr, ph), (pr * 0.92, ph), (pr * 0.91, ph * 0.93), (0, ph * 0.93)],
+          (0, 0, 0), m.stone, parent=root, col=col)
+    soil = ph * 0.93
+    lathe(f"{name}_soil", [(0, soil - 0.004), (pr * 0.9, soil - 0.004), (pr * 0.9, soil + 0.004), (0, soil + 0.01)], (0, 0, 0), m.soil, parent=root, col=col)
+    top = 1.22
+    cable(f"{name}_trunk", [(0, 0, soil), (0.012, -0.006, 0.75), (-0.006, 0.008, 1.0), (0.004, 0.0, top)], 0.017, m.bark, parent=root, col=col)
+    # 수관: 살짝 위로 긴 타원체(가로 반지름 0.30, 세로 0.36). 안쪽 가지 몇 개와 바깥 껍질 쪽에 몰린 작은 잎들.
+    cx, cz, rx, rz = 0.0, top + 0.26, 0.30, 0.36
+    for i in range(7):
+        a = rng.uniform(0, 2 * math.pi)
+        end = (math.cos(a) * rx * 0.55, math.sin(a) * rx * 0.55, cz + rng.uniform(-0.15, 0.2))
+        cable(f"{name}_branch_{i}", [(0, 0, top - 0.04), (end[0] * 0.4, end[1] * 0.4, (top + end[2]) / 2), end], 0.006, m.bark, parent=root, col=col)
+    for i in range(700):
+        # 껍질 쪽에 몰리게 반지름을 고르고, 아래쪽은 조금 성기게
+        u = rng.uniform(-1, 1) ** 1
+        a = rng.uniform(0, 2 * math.pi)
+        r = rng.uniform(0.5, 1.0) ** 0.6
+        if u < -0.6 and rng.random() < 0.5:
+            continue
+        horiz = math.sqrt(max(0.0, 1 - u * u))
+        dx, dy, dz = math.cos(a) * horiz, math.sin(a) * horiz, u
+        base = (cx + dx * rx * r, dy * rx * r, cz + dz * rz * r)
+        _leaf(f"{name}_leaf_{i}", rng.uniform(0.055, 0.085), rng.uniform(0.026, 0.036), R(rng.uniform(-25, 35) + 25 * dz),
+              rng.uniform(1.5, 4.0), math.atan2(-dx, dy) + rng.uniform(-0.6, 0.6), base,
+              m.ficus[int(rng.choice(3, p=[0.45, 0.4, 0.15]))], root, col, twist=rng.uniform(-0.6, 0.6), n=5)
     return root
 
 

@@ -80,8 +80,8 @@ def layout(m, night, col, rack_root, cable_mats):
         dx = -0.04 + k * 0.025
         cable(f"tray_drop_{k}", [(0.30 + dx, Y1 - 0.12, 2.04), (0.30 + dx, Y1 - 0.16, 1.70), (0.30 + dx, 1.12, 1.36)],
               0.0055, cable_mats[k % len(cable_mats)], col=col)
-    # 구석 식물은 책상 너머로 잎이 보이도록 키를 키운다
-    props.plant(m, "plant_corner", (-1.42, 1.10, 0), col, height=1.0, pot=0, seed=3, reach=1.9)
+    # 구석에는 사무실에 흔한 벤자민 고무나무: 책상 너머로 둥근 수관이 보인다
+    props.ficus(m, "plant_corner", (-1.36, 1.06, 0), col, seed=3)
     # 왼쪽 벽: 작업 책상, 의자, 선반, 간판
     # 와이드 모니터: 좌우로 나눈 에디터 두 칸
     code = np.concatenate([tx.code(w=420, h=340, seed=3), tx.code(w=420, h=340, seed=9)], axis=1)
@@ -99,8 +99,6 @@ def layout(m, night, col, rack_root, cable_mats):
     props.dock(m, "dock", (-0.62, Y1 - 0.07, 0), 0, col)
     props.vacuum(m, (-0.62, Y1 - 0.25, 0), col)
     props.blinds(m, "blinds", WIN[0] - 0.03, WIN[1] + 0.03, WIN[3] + 0.035, Y1 - 0.035, col)
-    # 랙 뒤에 가려지지 않게 수납장 앞 빈 바닥에 둔다
-    props.plant(m, "plant_side", (1.42, 0.62, 0), col, height=0.55, pot=1, seed=12)
 
 
 def lights(theme):

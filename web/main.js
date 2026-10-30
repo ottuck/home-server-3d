@@ -8,11 +8,12 @@ import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js"
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
-import { STATUS_COLOR, fetchStatus, fetchHistory, containerStatus, unitStatus } from "./status.js";
-import { drawMonitor, chartsHTML } from "./monitor.js";
+import { STATUS_COLOR, fetchStatus, fetchHistory, fetchGithub, containerStatus, unitStatus } from "./status.js";
+import { drawMonitor, chartsHTML, drawCommits, commitsHTML } from "./monitor.js";
 
 const REFRESH_MS = 5000;
 const HISTORY_MS = 60_000; // 벽 모니터 기록(API가 1분 캐시)
+const GITHUB_MS = 600_000; // 책상 모니터 커밋(API가 10분 캐시)
 const STATUS_LABEL = { ok: "정상", warn: "주의", error: "오류", unknown: "데이터 없음" };
 const RANK = { ok: 0, unknown: 1, warn: 2, error: 3 };
 
@@ -24,8 +25,9 @@ const TARGET = B(0, 0.1, 1.08);
 const TILT = THREE.MathUtils.degToRad(58);
 const YAW = THREE.MathUtils.degToRad(40);
 const VIEW_DIR = new THREE.Vector3(Math.sin(TILT) * Math.sin(YAW), Math.cos(TILT), Math.sin(TILT) * Math.cos(YAW));
-// 벽 모니터를 볼 때는 회전 한계 안에서 화면을 가장 정면에 가깝게 본다
+// 모니터를 볼 때는 회전 한계 안에서 화면을 가장 정면에 가깝게 본다(벽 모니터는 앞, 책상 모니터는 오른쪽을 본다)
 const MONITOR_DIR = new THREE.Vector3().setFromSphericalCoords(1, TILT - THREE.MathUtils.degToRad(13), YAW - THREE.MathUtils.degToRad(24));
+const DESK_DIR = new THREE.Vector3().setFromSphericalCoords(1, TILT - THREE.MathUtils.degToRad(13), YAW + THREE.MathUtils.degToRad(24));
 const VIEW_HALF_W = 6.5 / 2;
 const VIEW_HALF_H = 4.06 / 2;
 // 방 바닥 범위(팬 제한): Blender x[-1.7,1.7], y[-1.4,1.4]
@@ -153,6 +155,8 @@ const screens = []; // 화면 재질(*_screen)
 let skyline = null; // { material, day, night }
 let monitor = null; // 벽 모니터 { screen, parts, canvas, texture }
 let history = null;
+let desk = null; // 책상 모니터 { screen, parts, canvas, texture, code: 원래 그림 }
+let github = null;
 let rack = null;
 let infra = null;
 let status = null;
@@ -175,6 +179,7 @@ function setupScene(gltf, nightSky) {
       }
       if (o.name.endsWith("_screen")) screens.push(o.material);
       if (o.name === "screen_grafana_screen") setupMonitor(o);
+      if (o.name === "desk_mon_screen") setupDesk(o);
       if (o.name === "skyline") {
         nightSky.flipY = false;
         nightSky.colorSpace = THREE.SRGBColorSpace;
@@ -200,6 +205,12 @@ function setupScene(gltf, nightSky) {
   scene.add(root);
   root.updateMatrixWorld(true); // 첫 렌더 전에 장비 위치(이름표 기준점)를 계산하려면 필요하다
   makeTags();
+  if (desk) {
+    // 화면이 작아 누르기 쉽게 테두리까지 덮는 투명 상자를 함께 고른다(위치 계산이 끝난 뒤에 잰다)
+    const hit = hitBox(new THREE.Box3().setFromObject(desk.screen), 0.05);
+    scene.add(hit);
+    desk.parts.push(hit);
+  }
   setupSwitches(root);
   setupVacuum(root.getObjectByName("part__vacuum"));
   setupToys(root);
@@ -207,13 +218,7 @@ function setupScene(gltf, nightSky) {
 
 // 벽 모니터의 장식 그림을 실제 그래프 캔버스로 바꾼다(glTF UV에 맞춰 flipY 끔).
 function setupMonitor(screen) {
-  const canvas = document.createElement("canvas");
-  canvas.width = 1280;
-  canvas.height = 720;
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.flipY = false;
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  const { canvas, texture } = screenTexture(1280, 720);
   screen.material.map = screen.material.emissiveMap = texture;
   screen.material.needsUpdate = true;
   monitor = { screen, parts: [screen], canvas, texture };
@@ -224,6 +229,36 @@ function paintMonitor() {
   if (!monitor) return;
   drawMonitor(monitor.canvas, history);
   monitor.texture.needsUpdate = true;
+}
+
+function screenTexture(w, h) {
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.flipY = false;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return { canvas, texture };
+}
+
+// 책상 와이드 모니터(21:9)에 GitHub 최근 커밋을 띄운다. 커밋을 못 받으면 원래 장식 그림(코드)을 둔다.
+function setupDesk(screen) {
+  desk = { screen, parts: [screen], code: screen.material.map, ...screenTexture(1680, 720) };
+}
+
+function paintDesk() {
+  if (!desk) return;
+  const live = github?.commits?.length > 0;
+  if (live) {
+    drawCommits(desk.canvas, github);
+    desk.texture.needsUpdate = true;
+  }
+  const map = live ? desk.texture : desk.code;
+  if (desk.screen.material.map !== map) {
+    desk.screen.material.map = desk.screen.material.emissiveMap = map;
+    desk.screen.material.needsUpdate = true;
+  }
 }
 
 // ---------------------------------------------------------------- 테마
@@ -275,10 +310,16 @@ function renderPanel() {
   $("overall").innerHTML = `<i class="dot ${overall}"></i><b>${STATUS_LABEL[overall]}</b> · ${source} · ${when}`;
 
   const host = status?.host ?? {};
-  $("charts").hidden = !monitorFocused;
-  if (monitorFocused) {
+  $("charts").hidden = screenFocus !== "grafana";
+  if (screenFocus === "grafana") {
     $("charts-src").textContent = !history?.start ? "" : history.demo ? "예시 데이터" : "1분 간격";
     $("chart-list").innerHTML = chartsHTML(history);
+  }
+
+  $("commits").hidden = screenFocus !== "desk";
+  if (screenFocus === "desk") {
+    $("commits-src").textContent = !github?.commits?.length ? "" : github.demo ? "예시 데이터" : "공개 저장소";
+    $("commit-list").innerHTML = commitsHTML(github);
   }
 
   $("metrics").innerHTML = [["CPU", host.cpu], ["메모리", host.mem], ["디스크", host.disk]].map(([k, v]) => {
@@ -306,7 +347,8 @@ function renderPanel() {
     u.tag.classList.toggle("sel", id === selected);
   }
 }
-$("ext-grafana").onclick = () => focusMonitor();
+$("ext-grafana").onclick = () => focusScreen("grafana");
+$("ext-github").onclick = () => focusScreen("desk");
 $("services").addEventListener("click", (e) => {
   const li = e.target.closest(".svc");
   if (li) select(li.dataset.id === selected ? null : li.dataset.id, true);
@@ -315,7 +357,7 @@ $("services").addEventListener("click", (e) => {
 // ---------------------------------------------------------------- 랙 확대·선택
 
 let focused = false; // 랙 확대
-let monitorFocused = false; // 벽 모니터 확대
+let screenFocus = null; // 확대해 보는 화면: "grafana"(벽 모니터) | "desk"(책상 모니터)
 let selected = null;
 let anim = null;
 const clock = new THREE.Clock();
@@ -347,18 +389,19 @@ function focusRack() {
   // 랙과 오른쪽 이름표가 함께 보이도록 목표점을 랙 오른쪽으로 조금 옮긴다
   flyTo(c.add(new THREE.Vector3(0.18, -0.02, 0.1)), THREE.MathUtils.clamp((2 * halfH) / (h * 1.25), 1, 5));
   focused = true;
-  monitorFocused = false;
+  screenFocus = null;
   $("back").classList.add("show");
 }
 
-function focusMonitor() {
-  if (!monitor) return;
-  const box = new THREE.Box3().setFromObject(monitor.screen);
+function focusScreen(which) {
+  const s = which === "desk" ? desk : monitor;
+  if (!s) return;
+  const box = new THREE.Box3().setFromObject(s.screen);
   const w = Math.hypot(box.max.x - box.min.x, box.max.z - box.min.z);
   // 화면 폭이 보이는 폭의 약 80%가 되게 맞춘다
-  flyTo(box.getCenter(new THREE.Vector3()), THREE.MathUtils.clamp((2 * camera.right) / (w * 1.25), 1, 5), MONITOR_DIR);
+  flyTo(box.getCenter(new THREE.Vector3()), THREE.MathUtils.clamp((2 * camera.right) / (w * 1.25), 1, 5), which === "desk" ? DESK_DIR : MONITOR_DIR);
   focused = false;
-  monitorFocused = true;
+  screenFocus = which;
   select(null);
   $("back").classList.add("show");
   $("panel").scrollTop = 0;
@@ -367,7 +410,7 @@ function focusMonitor() {
 function home() {
   flyTo(TARGET.clone(), 1);
   focused = false;
-  monitorFocused = false;
+  screenFocus = null;
   select(null);
   $("back").classList.remove("show");
 }
@@ -443,7 +486,7 @@ function placeTags() {
 }
 
 $("back").onclick = home;
-addEventListener("keydown", (e) => e.key === "Escape" && (focused || monitorFocused) && home());
+addEventListener("keydown", (e) => e.key === "Escape" && (focused || screenFocus) && home());
 
 // ---------------------------------------------------------------- 조명 스위치, 고양이
 
@@ -694,7 +737,13 @@ function paintLeds() {
 async function refreshHistory() {
   history = await fetchHistory();
   paintMonitor();
-  if (monitorFocused) renderPanel();
+  if (screenFocus === "grafana") renderPanel();
+}
+
+async function refreshGithub() {
+  github = await fetchGithub();
+  paintDesk();
+  if (screenFocus === "desk") renderPanel();
 }
 
 async function refresh() {
@@ -729,9 +778,11 @@ function unitOf(obj) {
 }
 
 const inRack = (obj) => { for (let o = obj; o; o = o.parent) if (o === rack) return true; return false; };
-const pickables = () => [rack, ...(monitor?.parts ?? []), ...switches.map((s) => s.hit), ...toys.flatMap((t) => t.pick), vacuum?.node].filter(Boolean);
+const pickables = () => [rack, ...(monitor?.parts ?? []), ...(desk?.parts ?? []), ...switches.map((s) => s.hit), ...toys.flatMap((t) => t.pick), vacuum?.node].filter(Boolean);
 const switchOf = (hit) => hit && switches.find((s) => s.hit === hit.object);
-const onMonitor = (hit) => !!hit && monitor.parts.some((p) => { for (let o = hit.object; o; o = o.parent) if (o === p) return true; return false; });
+const onParts = (hit, s) => !!hit && !!s && s.parts.some((p) => { for (let o = hit.object; o; o = o.parent) if (o === p) return true; return false; });
+const onMonitor = (hit) => onParts(hit, monitor);
+const onDesk = (hit) => onParts(hit, desk);
 
 function showTip(e, html) {
   tip.innerHTML = html;
@@ -747,6 +798,7 @@ renderer.domElement.addEventListener("pointermove", (e) => {
   // 소품은 이름표 없이 눌렀을 때 움직이는 것으로 충분하다(손가락 커서만 바꾼다)
   if (switchOf(hit) || toyOf(hit) || (hit && isVacuum(hit.object))) return (tip.style.display = "none");
   if (onMonitor(hit)) return showTip(e, "<b>Grafana Cloud</b><div class=\"row muted\">최근 1시간 서버 지표 · 눌러서 크게 보기</div>");
+  if (onDesk(hit)) return showTip(e, "<b>GitHub</b><div class=\"row muted\">최근 공개 커밋 · 눌러서 크게 보기</div>");
   const unit = hit && unitOf(hit.object);
   if (!unit || unit.info.decor || !unit.info.containers?.length) return (tip.style.display = "none");
   const { info } = unit;
@@ -776,12 +828,14 @@ renderer.domElement.addEventListener("pointerup", (e) => {
     runVacuum(clock.getElapsedTime(), true);
     tip.style.display = "none";
   } else if (onMonitor(hit)) {
-    if (!monitorFocused) focusMonitor();
+    if (screenFocus !== "grafana") focusScreen("grafana");
+  } else if (onDesk(hit)) {
+    if (screenFocus !== "desk") focusScreen("desk");
   } else if (hit) {
     const unit = unitOf(hit.object);
     if (!focused) focusRack();
     select(unit && !unit.info.decor && unit.info.containers?.length ? unit.info.id : null);
-  } else if (focused || monitorFocused) {
+  } else if (focused || screenFocus) {
     home();
   }
 });
@@ -826,5 +880,7 @@ setInterval(() => {
 renderPanel();
 refreshHistory();
 setInterval(refreshHistory, HISTORY_MS);
+refreshGithub();
+setInterval(refreshGithub, GITHUB_MS);
 await refresh();
 setInterval(refresh, REFRESH_MS);

@@ -1,5 +1,5 @@
-// 벽 모니터(Grafana Cloud 화면)에 그리는 실제 그래프와, 모니터를 눌렀을 때 패널에 띄우는 큰 차트.
-// 데이터는 fetchHistory()(status.js)의 최근 1시간 호스트 지표다.
+// 벽 모니터(Grafana Cloud 화면)와 책상 모니터(GitHub 최근 커밋)에 그리는 그림, 그리고 눌렀을 때 패널에 띄우는 내용.
+// 데이터는 status.js의 fetchHistory()(최근 1시간 호스트 지표)와 fetchGithub()(공개 저장소 최근 커밋)다.
 
 // 칸 순서와 색은 Blender 장식 화면(blender/textures.py dashboard)과 같다: 왼쪽 위부터 초록, 주황, 파랑, 보라.
 export const CHARTS = [
@@ -9,6 +9,7 @@ export const CHARTS = [
   { key: "disk", label: "디스크", color: "#b373ff" },
 ];
 const FONT = 'system-ui, "Segoe UI", "Malgun Gothic", sans-serif';
+const MONO = 'ui-monospace, "Cascadia Code", Consolas, "Malgun Gothic", monospace';
 
 const hasData = (h) => !!h && Object.keys(h.series ?? {}).length > 0;
 const last = (list) => list?.findLast((v) => v != null) ?? null;
@@ -153,4 +154,73 @@ export function chartsHTML(h) {
       `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${grid}${paths}</svg>` +
       `<div class="chart-x"><span>${note}</span><span>최대 ${maxText(c, max)} · 지금</span></div></div>`;
   }).join("");
+}
+
+// ---------------------------------------------------------------- 책상 모니터: GitHub 최근 커밋
+
+export function ago(date) {
+  const min = Math.max(0, Math.round((Date.now() - new Date(date)) / 60000));
+  if (min < 1) return "방금";
+  if (min < 60) return `${min}분 전`;
+  if (min < 60 * 24) return `${Math.round(min / 60)}시간 전`;
+  return `${Math.round(min / 60 / 24)}일 전`;
+}
+
+const esc = (t) => String(t).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+const fit = (g, text, w) => {
+  if (g.measureText(text).width <= w) return text;
+  while (text && g.measureText(text + "…").width > w) text = text.slice(0, -1);
+  return text + "…";
+};
+
+// 편집기 옆 터미널에서 `git log`를 띄운 모습. 와이드 모니터(21:9) 그림이다.
+export function drawCommits(canvas, gh) {
+  const g = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height, bar = 64, pad = 40;
+  g.fillStyle = "#0d1117";
+  g.fillRect(0, 0, W, H);
+  g.fillStyle = "#161b22";
+  g.fillRect(0, 0, W, bar);
+  ["#ff5f57", "#febc2e", "#28c840"].forEach((c, i) => {
+    g.fillStyle = c;
+    g.beginPath();
+    g.arc(36 + i * 34, bar / 2, 10, 0, Math.PI * 2);
+    g.fill();
+  });
+  g.textBaseline = "middle";
+  g.fillStyle = "#8b949e";
+  g.font = `500 26px ${MONO}`;
+  g.fillText(`${gh.user ?? "github"} — git log · 최근 공개 커밋`, 150, bar / 2);
+
+  const line = 58;
+  let y = bar + 44;
+  g.font = `500 30px ${MONO}`;
+  for (const c of gh.commits) {
+    if (y > H - 30) break;
+    let x = pad;
+    g.fillStyle = "#e3b341";
+    g.fillText(c.sha, x, y);
+    x += g.measureText(c.sha).width + 22;
+    g.fillStyle = "#79c0ff";
+    g.fillText(c.repo, x, y);
+    x += g.measureText(c.repo).width + 22;
+    const when = ago(c.date);
+    g.fillStyle = "#7d8590";
+    const ww = g.measureText(when).width;
+    g.fillText(when, W - pad - ww, y);
+    g.fillStyle = "#e6edf3";
+    g.fillText(fit(g, c.message, W - pad - ww - 30 - x), x, y);
+    y += line;
+  }
+}
+
+export function commitsHTML(gh) {
+  if (!gh?.commits?.length) return `<div class="note">커밋을 불러오지 못했습니다.</div>`;
+  const base = gh.user && !gh.demo ? `https://github.com/${gh.user}` : null;
+  const items = gh.commits.map((c) => {
+    const body = `<div class="commit-h"><span>${esc(c.repo)}</span><span>${ago(c.date)}</span></div><div class="commit-m">${esc(c.message)}</div>`;
+    return base ? `<li><a href="${base}/${encodeURIComponent(c.repo)}/commit/${esc(c.sha)}" target="_blank" rel="noopener">${body}</a></li>` : `<li>${body}</li>`;
+  }).join("");
+  const more = base ? `<div class="note"><a href="${base}" target="_blank" rel="noopener">GitHub에서 더 보기 →</a></div>` : "";
+  return `<ul class="commits">${items}</ul>${more}`;
 }

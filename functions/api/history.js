@@ -1,5 +1,6 @@
 // GET /api/history — 벽 모니터용 최근 1시간 호스트 지표(1분 간격). 서버 전체 합계 숫자만 싣는다.
-import { UNIX, cachedJson, prom, round, tag } from "../_lib/prom.js";
+import { cachedJson } from "../_lib/cache.js";
+import { UNIX, prom, round, tag } from "../_lib/prom.js";
 
 const TTL = 60; // 초. 캐시 기간
 const FAIL_TTL = 10;

@@ -52,6 +52,15 @@
     .chart svg { display: block; width: 100%; height: 64px; margin-top: 4px; border-radius: 6px; background: var(--hover); }
     .chart .grid { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
     .chart-x { display: flex; justify-content: space-between; font-size: 10px; color: var(--sub); margin-top: 2px; }
+    .commits { margin-top: 4px; }
+    .commits li { border-top: 1px solid var(--line); }
+    .commits li:first-child { border-top: 0; }
+    .commits a { display: block; color: inherit; text-decoration: none; padding: 7px 4px; border-radius: 8px; }
+    .commits a:hover { background: var(--hover); }
+    .commit-h { display: flex; justify-content: space-between; font-size: 11px; color: var(--sub); }
+    .commit-h span:first-child { color: var(--accent); font-weight: 600; }
+    .commit-m { font-size: 12px; margin-top: 2px; overflow-wrap: anywhere; }
+    .note a { color: var(--accent); text-decoration: none; }
     .legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; color: var(--sub); margin-top: 16px; }
     .legend span { display: flex; align-items: center; gap: 4px; }
     .note { font-size: 11px; color: var(--sub); margin-top: 10px; }
@@ -104,6 +113,10 @@
       </header>
       <div class="overall" id="overall"></div>
       <div class="metrics" id="metrics"></div>
+      <section id="commits" hidden>
+        <h2>GitHub 최근 작업 <span id="commits-src"></span></h2>
+        <div id="commit-list"></div>
+      </section>
       <section id="charts" hidden>
         <h2>최근 1시간 <span id="charts-src"></span></h2>
         <div id="chart-list"></div>
@@ -111,12 +124,12 @@
       <h2>서비스 <span id="svc-count"></span></h2>
       <ul id="services"></ul>
       <h2>외부 서비스</h2>
-      <div class="ext"><span class="link" id="ext-grafana">Grafana Cloud · 지표</span><span>Sentry · 오류 추적</span></div>
+      <div class="ext"><span class="link" id="ext-grafana">Grafana Cloud · 지표</span><span class="link" id="ext-github">GitHub · 최근 작업</span><span>Sentry · 오류 추적</span></div>
       <div class="legend">
         <span><i class="dot ok"></i>정상</span><span><i class="dot warn"></i>주의</span>
         <span><i class="dot error"></i>오류</span><span><i class="dot unknown"></i>데이터 없음</span>
       </div>
-      <div class="note">랙이나 벽 모니터를 누르면 가까이서 볼 수 있고, 조명·블라인드·의자·책·청소기도 눌러 볼 수 있어요. 랙 하나가 서버 한 대, LED 하나가 컨테이너 하나입니다.</div>
+      <div class="note">랙이나 모니터를 누르면 가까이서 볼 수 있고, 조명·블라인드·의자·책·청소기도 눌러 볼 수 있어요. 랙 하나가 서버 한 대, LED 하나가 컨테이너 하나입니다.</div>
     </aside>
   </div>
   <div class="tip" id="tip"></div>

@@ -56,6 +56,33 @@ function fakeHistory() {
   };
 }
 
+// 책상 모니터용 공개 저장소 최근 커밋(/api/github, functions/api/github.js).
+// 반환 형태: { updatedAt, user, commits: [{ repo, sha, message, date }] }. 실패하면 commits가 빈 배열이다.
+export async function fetchGithub() {
+  if (DEMO) return fakeGithub();
+  try {
+    const res = await fetch("/api/github");
+    if (!res.ok) throw new Error(`github ${res.status}`);
+    const g = await res.json();
+    return { updatedAt: g.updatedAt, user: g.user, commits: g.commits ?? [] };
+  } catch {
+    if (LOCAL) return fakeGithub();
+    return { updatedAt: new Date().toISOString(), user: null, commits: [] };
+  }
+}
+
+function fakeGithub() {
+  const ago = (min) => new Date(Date.now() - min * 60000).toISOString();
+  const commits = [
+    ["home-server-3d", "Add a robot vacuum that cleans the room", 12],
+    ["home-server-3d", "Show recent commits on the desk monitor", 40],
+    ["diagram-polish", "Keep label pills off arrowheads", 300],
+    ["stable-wallet", "Add the send screen", 1500],
+    ["pokepedia", "Cache Pokémon sprites", 2900],
+  ].map(([repo, message, min], i) => ({ repo, sha: (0x1a2b3c4 + i * 0x111111).toString(16).slice(0, 7), message, date: ago(min) }));
+  return { updatedAt: new Date().toISOString(), user: "example", demo: true, commits };
+}
+
 let tick = 0;
 function fakeStatus(infra) {
   const names = infra.units.flatMap((u) => (u.containers ?? []).map((c) => c.id));

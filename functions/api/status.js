@@ -2,7 +2,8 @@
 // 응답에는 공개 컨테이너 id(infra.json)와 상태, 호스트 % 숫자만 싣는다.
 // cAdvisor 라벨·호스트 이름·IP·쿼리는 절대 내보내지 않는다.
 import infra from "../../shared/infra.json";
-import { CAD, UNIX, cachedJson, prom, round, tag } from "../_lib/prom.js";
+import { cachedJson } from "../_lib/cache.js";
+import { CAD, UNIX, prom, round, tag } from "../_lib/prom.js";
 
 const TTL = 60; // 초. 캐시 기간
 const FAIL_TTL = 10; // 초. 조회 실패 응답은 짧게만 캐시해 곧 다시 시도한다.

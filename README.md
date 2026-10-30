@@ -20,6 +20,7 @@ AWS Lightsail 서버 한 대를 작은 3D 서버실로 꾸민 웹 페이지입�
 - **오른쪽 패널**에서 CPU·메모리·디스크 사용률과 서비스별 상태를 볼 수 있습니다. 서비스를 누르면 카메라가 랙으로 다가갑니다.
 - **낮과 밤**은 보는 사람의 시각에 맞춰 바뀝니다(오전 6시~오후 6시는 낮). 버튼으로 직접 바꿀 수도 있습니다.
 - **벽 모니터**에는 최근 1시간의 실제 CPU·메모리·네트워크·디스크 그래프가 1분마다 그려집니다. 모니터를 누르면 카메라가 다가가고 패널에 큰 차트가 열립니다.
+- **책상 모니터**에는 GitHub 공개 저장소의 최근 커밋이 터미널의 `git log`처럼 떠 있습니다. 누르면 패널에 목록이 열리고, 각 커밋으로 바로 갈 수 있습니다.
 - **방 안 물건도 눌러 볼 수 있습니다.**
   - 스탠드, 책상 스탠드, 탁상등, 벽등, 간판은 누를 때마다 켜지고 꺼집니다.
   - 창의 블라인드를 내리고 올릴 수 있습니다. 내리면 창으로 드는 빛이 줄어듭니다.
@@ -47,7 +48,7 @@ AWS Lightsail 서버 한 대를 작은 3D 서버실로 꾸민 웹 페이지입�
 | 3D 제작 | Blender 5.2 (Python 스크립트로 장면 생성, Cycles 렌더) |
 | 3D 파일 | glTF(GLB), Draco 압축 |
 | 웹 | three.js 0.170, HTML, CSS, JavaScript (빌드 도구 없이 ES 모듈과 import map) |
-| 상태 API | Cloudflare Pages Functions, Cache API |
+| 상태 API | Cloudflare Pages Functions, Cache API, GitHub REST API(커밋 검색) |
 | 모니터링 데이터 | Grafana Cloud (Prometheus, PromQL), Grafana Alloy, cAdvisor |
 | 배포 | Cloudflare Pages (GitHub에 push하면 자동 배포) |
 | 개발 도구 | Node.js, Wrangler, Git / GitHub |

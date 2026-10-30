@@ -23,6 +23,7 @@ class Mats:
         self.brass = mat("brass", (0.78, 0.58, 0.30), rough=0.3, metal=1.0)
         self.fabric = mat("fabric_cream", (0.66, 0.60, 0.50), rough=0.95)
         # 북유럽풍: 검은 것은 랙과 Grafana 모니터 테두리뿐이고, 나머지 금속·플라스틱은 따뜻한 흰색, 작은 부분은 연회색이다
+        self.chrome = mat("chrome", (0.86, 0.86, 0.87), rough=0.12, metal=1.0)
         self.white_metal = mat("white_metal", (0.86, 0.85, 0.82), rough=0.35)
         self.white_plastic = mat("white_plastic", (0.89, 0.88, 0.85), rough=0.45)
         self.light_gray = mat("light_gray", (0.58, 0.58, 0.56), rough=0.5)
@@ -51,7 +52,7 @@ class Mats:
         self.pages = mat("book_pages", (0.86, 0.82, 0.71), rough=0.85)
         self.armchair_fabric = self._fabric("armchair_fabric", (0.40, 0.50, 0.38), "weave", 8, 3)
         self.pillow_fabric = self._fabric("pillow_fabric", (0.66, 0.60, 0.50), "weave", 10, 4)
-        self.chair_mesh = self._fabric("chair_mesh", (0.60, 0.60, 0.58), "mesh", 10, 5)
+        self.chair_mesh = self._fabric("chair_mesh", (0.36, 0.36, 0.35), "mesh", 10, 5)
         self.vacuum = mat("vacuum_white", (0.88, 0.88, 0.86), rough=0.35, coat=0.3)
         self.vacuum_led = mat("vacuum_led", (0.30, 1.0, 0.55), rough=0.3, emit=(0.30, 1.0, 0.55), strength=4.0)
         self.blind = mat("blind", (0.93, 0.91, 0.86), rough=0.6)
@@ -259,7 +260,7 @@ def monitor(m, name, loc, rotz, img, root, col, w=0.56, h=0.33):
 
 def keyboard(m, name, loc, root, col):
     r = empty(name, loc, parent=root, col=col)
-    box(f"{name}_case", (0.36, 0.12, 0.016), (0, 0, 0.008), m.white_plastic, bevel=0.005, parent=r, col=col)
+    box(f"{name}_case", (0.36, 0.12, 0.016), (0, 0, 0.008), m.charcoal, bevel=0.005, parent=r, col=col)
     for row in range(4):
         for k in range(14):
             kw = 0.020 if not (row == 0 and 4 <= k <= 9) else 0.020
@@ -279,23 +280,32 @@ def mug(m, name, loc, root, col, material=None):
 
 
 def desk_lamp(m, name, loc, rotz, root, col):
-    """구스넥 책상 스탠드. 갓의 좁은 쪽(목)이 팔 끝에 붙고, 넓은 입은 앞(-Y) 아래를 향한다."""
+    """크롬 관절 스탠드: 둥근 받침, 두 가닥 막대로 된 아래·위 팔과 관절, 앞(-Y) 아래를 보는 반구 갓."""
     r = empty(name, loc, parent=root, col=col)
     r.rotation_euler = (0, 0, R(rotz))
-    cyl(f"{name}_base", 0.075, 0.018, (0, 0, 0.009), m.white_metal, segments=32, bevel=0.005, parent=r, col=col)
-    cyl(f"{name}_foot", 0.016, 0.02, (0, 0, 0.028), m.brass, segments=20, parent=r, col=col)
-    tip = (0.0, -0.10, 0.43)
-    cable(f"{name}_arm", [(0, 0, 0.03), (0.0, 0.05, 0.27), tip], 0.007, m.white_metal, parent=r, col=col)
-    # 갓 축: 위·뒤(+Y)로 25° 기운 방향. 원뿔의 좁은 끝이 정확히 팔 끝에 오도록 놓는다.
-    tilt = R(-25)
-    axis = (0.0, -math.sin(tilt), math.cos(tilt))
-    depth = 0.11
-    base = tuple(t - depth * a for t, a in zip(tip, axis))
-    shade = cone(f"{name}_shade", 0.085, 0.026, depth, base, m.white_metal, segments=40, bevel=0.002, parent=r, col=col, caps=False)
-    shade.rotation_euler = (tilt, 0, 0)
-    neck = cyl(f"{name}_neck", 0.02, 0.03, tuple(t - 0.008 * a for t, a in zip(tip, axis)), m.brass, segments=20, parent=r, col=col)
-    neck.rotation_euler = (tilt, 0, 0)
-    sphere(f"{name}_bulb", 0.024, tuple(b + 0.035 * a for b, a in zip(base, axis)), m.bulb, parent=r, col=col)
+    lathe(f"{name}_base", [(0, 0), (0.075, 0), (0.075, 0.012), (0.06, 0.02), (0.02, 0.024), (0, 0.024)], (0, 0, 0), m.chrome, parent=r, col=col)
+    hinge0, elbow, head = (0.0, 0.03, 0.035), (0.0, 0.10, 0.33), (0.0, -0.12, 0.40)
+
+    def arm(part, a, b):
+        for sx in (-1, 1):  # 두 가닥 막대
+            cable(f"{name}_{part}_{sx}", [(a[0] + sx * 0.009, a[1], a[2]), (b[0] + sx * 0.009, b[1], b[2])], 0.0045, m.chrome, parent=r, col=col)
+        # 가닥 사이의 스프링 대신 가는 막대 하나
+        mid = tuple((p + q) / 2 for p, q in zip(a, b))
+        cable(f"{name}_{part}_spring", [a, mid, b], 0.0025, m.chrome, parent=r, col=col)
+
+    arm("lower", hinge0, elbow)
+    arm("upper", elbow, head)
+    for k, at in enumerate((hinge0, elbow, head)):  # 관절 나사
+        cyl(f"{name}_joint_{k}", 0.012, 0.03, at, m.chrome, axis="X", segments=16, parent=r, col=col)
+    # 반구 갓: 꼭대기가 위·뒤(+Y)로 25° 기울어 머리 관절에 붙고, 입은 앞 아래를 본다
+    tilt, rad = R(-25), 0.07
+    up = (0.0, -math.sin(tilt), math.cos(tilt))
+    c = tuple(h - rad * u for h, u in zip(head, up))
+    prof = [(rad * math.sin(math.pi / 2 * k / 8), rad * math.cos(math.pi / 2 * k / 8)) for k in range(9)]
+    inner = [(x * 0.96, z * 0.96) for x, z in reversed(prof)]
+    dome = lathe(f"{name}_shade", [(0, rad)] + prof[1:] + inner[:-1] + [(0, rad * 0.96)], c, m.chrome, segments=40, parent=r, col=col)
+    dome.rotation_euler = (tilt, 0, 0)
+    sphere(f"{name}_bulb", 0.022, tuple(p + 0.025 * u for p, u in zip(c, up)), m.bulb, parent=r, col=col)
 
 
 def desk(m, name, loc, rotz, col, screen):
@@ -315,7 +325,7 @@ def desk(m, name, loc, rotz, col, screen):
     # 정면을 보는 와이드 모니터 한 대(34인치급, 21:9)
     monitor(m, f"{name}_mon", (0.0, 0.10, z), 0, screen, root, col, w=0.84, h=0.36)
     keyboard(m, f"{name}_kbd", (0.0, -0.16, z), root, col)
-    sphere(f"{name}_mouse", 0.03, (0.30, -0.17, z + 0.012), m.white_plastic, scale=(0.75, 1.0, 0.45), parent=root, col=col)
+    sphere(f"{name}_mouse", 0.03, (0.30, -0.17, z + 0.012), m.charcoal, scale=(0.75, 1.0, 0.45), parent=root, col=col)
     mug(m, f"{name}_mug", (-0.42, -0.16, z), root, col)
     # 스탠드는 오른쪽 뒤에서 키보드·마우스 쪽 책상을 비춘다(갓이 모니터에 닿지 않게 조금 앞으로 둔다)
     desk_lamp(m, f"{name}_lamp", (0.60, 0.20, z), -30, root, col)
@@ -347,7 +357,7 @@ def _chair_back(m, name, parent, col, z0=0.52, height=0.54, y0=0.272):
     md.thickness = 0.012
     md.offset = 0
     rim = [point(1, j / nv) for j in range(0, nv + 1, 2)] + [point(-1, j / nv) for j in range(nv, -1, -2)]
-    cable(f"{name}_back_rim", rim, 0.011, m.white_metal, parent=parent, col=col, cyclic=True)
+    cable(f"{name}_back_rim", rim, 0.011, m.white_plastic, parent=parent, col=col, cyclic=True)
     return panel
 
 
@@ -364,7 +374,7 @@ def chair(m, name, loc, rotz, col):
     cyl(f"{name}_gas_cover", 0.032, 0.12, (0, 0, 0.14), m.light_gray, segments=24, bevel=0.004, parent=root, col=col)
     # 좌판 위쪽은 웹에서 빙글 돌리는 부분이다(축은 의자 중심)
     top = empty(f"part__{name}_top", (0, 0, 0), parent=root, col=col)
-    box(f"{name}_mech", (0.20, 0.22, 0.04), (0, 0.02, 0.37), m.white_metal, bevel=0.01, parent=top, col=col)
+    box(f"{name}_mech", (0.20, 0.22, 0.04), (0, 0.02, 0.37), m.light_gray, bevel=0.01, parent=top, col=col)
     uv_box(box(f"{name}_seat", (0.50, 0.48, 0.08), (0, 0, 0.43), m.chair_mesh, bevel=0.04, segments=5, parent=top, col=col), 0.06)
     # 등받이: 좌판 뒤 아래에서 올라오는 받침대가 등판 허리께를 붙잡는다
     cable(f"{name}_spine", [(0, 0.10, 0.38), (0, 0.27, 0.41), (0, 0.29, 0.60)], 0.018, m.white_metal, parent=top, col=col)
@@ -539,12 +549,31 @@ def table_lamp(m, name, loc, col):
     return root
 
 
+def _pleated_shade(name, r_bottom, r_top, height, z0, material, parent, col, pleats=36, segments=144):
+    """주름진 원뿔대 갓(위아래가 뚫린 한 겹 면)."""
+    verts, faces = [], []
+    for z, rr in ((z0, r_bottom), (z0 + height, r_top)):
+        for i in range(segments):
+            a = 2 * math.pi * i / segments
+            k = rr * (1 + 0.035 * math.cos(pleats * a))
+            verts.append((k * math.cos(a), k * math.sin(a), z))
+    faces = [(i, (i + 1) % segments, segments + (i + 1) % segments, segments + i) for i in range(segments)]
+    return mesh(name, verts, faces, (0, 0, 0), material, parent=parent, col=col)
+
+
 def floor_lamp(m, name, loc, col):
+    """황동 플로어 스탠드: 둥글게 솟은 받침, 가는 기둥과 마디, 위가 좁은 주름 흰 갓, 당김줄."""
     root = _root(name, loc, 0, col)
-    cyl(f"{name}_base", 0.14, 0.025, (0, 0, 0.0125), m.white_metal, segments=40, bevel=0.008, parent=root, col=col)
-    cyl(f"{name}_pole", 0.012, 1.38, (0, 0, 0.71), m.brass, segments=16, parent=root, col=col)
-    cone(f"{name}_shade", 0.22, 0.16, 0.28, (0, 0, 1.30), m.shade, segments=48, parent=root, col=col, caps=False)
-    sphere(f"{name}_bulb", 0.04, (0, 0, 1.38), m.bulb, parent=root, col=col)
+    lathe(f"{name}_base", [(0, 0), (0.13, 0), (0.13, 0.012), (0.11, 0.03), (0.06, 0.05), (0.025, 0.065), (0.02, 0.08), (0, 0.08)],
+          (0, 0, 0), m.brass, parent=root, col=col)
+    cyl(f"{name}_pole", 0.011, 1.22, (0, 0, 0.08 + 0.61), m.brass, segments=16, parent=root, col=col)
+    for z in (0.50, 0.95):  # 기둥 마디
+        cyl(f"{name}_ring_{z}", 0.016, 0.02, (0, 0, z), m.brass, segments=16, bevel=0.004, parent=root, col=col)
+    cyl(f"{name}_socket", 0.024, 0.06, (0, 0, 1.33), m.brass, segments=16, parent=root, col=col)
+    _pleated_shade(f"{name}_shade", 0.20, 0.11, 0.36, 1.24, m.shade, root, col)
+    sphere(f"{name}_bulb", 0.035, (0, 0, 1.38), m.bulb, parent=root, col=col)
+    cable(f"{name}_chain", [(0.06, 0, 1.33), (0.07, 0, 1.24), (0.07, 0, 1.13)], 0.0012, m.brass, parent=root, col=col)
+    sphere(f"{name}_chain_bead", 0.006, (0.07, 0, 1.125), m.brass, parent=root, col=col)
     return root
 
 
@@ -552,10 +581,10 @@ def vacuum(m, loc, col):
     """로봇 청소기. 정면(-Y)에 상태 LED가 있고, 웹에서 통째로 움직이므로 중심을 축으로 둔다(part__)."""
     root = empty("part__vacuum", loc, col=col)
     cyl("vacuum_body", 0.165, 0.062, (0, 0, 0.041), m.vacuum, segments=48, bevel=0.012, parent=root, col=col)
-    cyl("vacuum_bumper", 0.168, 0.03, (0, 0, 0.026), m.white_plastic, segments=48, bevel=0.006, parent=root, col=col)
-    cyl("vacuum_lid", 0.148, 0.004, (0, 0, 0.073), m.light_gray, segments=48, parent=root, col=col)
+    cyl("vacuum_bumper", 0.168, 0.03, (0, 0, 0.026), m.charcoal, segments=48, bevel=0.006, parent=root, col=col)
+    cyl("vacuum_lid", 0.148, 0.004, (0, 0, 0.073), m.charcoal, segments=48, parent=root, col=col)
     cyl("vacuum_lidar", 0.042, 0.024, (0, 0.05, 0.085), m.vacuum, segments=32, bevel=0.006, parent=root, col=col)
-    cyl("vacuum_lidar_cap", 0.034, 0.004, (0, 0.05, 0.098), m.light_gray, segments=32, parent=root, col=col)
+    cyl("vacuum_lidar_cap", 0.034, 0.004, (0, 0.05, 0.098), m.charcoal, segments=32, parent=root, col=col)
     cyl("vacuum_button", 0.014, 0.004, (0, -0.07, 0.076), m.ivory, segments=20, parent=root, col=col)
     cyl("vacuum_led", 0.007, 0.004, (0, -0.105, 0.076), m.vacuum_led, segments=16, parent=root, col=col)
     return root
@@ -565,7 +594,7 @@ def dock(m, name, loc, rotz, col):
     """청소기 충전대. 뒤(+Y)를 벽에 붙인다."""
     root = _root(name, loc, rotz, col)
     box(f"{name}_body", (0.26, 0.08, 0.11), (0, 0.03, 0.055), m.vacuum, bevel=0.02, parent=root, col=col)
-    box(f"{name}_face", (0.18, 0.006, 0.045), (0, -0.011, 0.06), m.light_gray, bevel=0.002, parent=root, col=col)
+    box(f"{name}_face", (0.18, 0.006, 0.045), (0, -0.011, 0.06), m.charcoal, bevel=0.002, parent=root, col=col)
     for sx in (-1, 1):
         box(f"{name}_pin_{sx}", (0.03, 0.02, 0.006), (sx * 0.05, -0.02, 0.003), m.brass, parent=root, col=col)
     return root

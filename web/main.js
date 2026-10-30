@@ -212,6 +212,7 @@ function setupScene(gltf, nightSky) {
     desk.parts.push(hit);
   }
   setupSwitches(root);
+  setupRattanLight(root.getObjectByName("prop__table_lamp"));
   setupVacuum(root.getObjectByName("part__vacuum"));
   setupToys(root);
 }
@@ -602,7 +603,79 @@ function stepSwitches(dt) {
       m.emissiveIntensity = off + (on - off) * s.level;
     }
     if (s.light != null) lamps[s.light].intensity = lamps[s.light].userData.power * s.level;
+    // 라탄 갓의 빛 무늬: 밤에는 또렷하게, 낮에는 햇빛에 묻혀 옅게
+    for (const p of s.patterns ?? []) p.material.opacity = s.level * (theme === "night" ? 1 : 0.25);
   }
+}
+
+// 라탄 탁상등 빛 무늬. 실시간 그림자 대신, 전구에서 나간 빛이 갓의 엮은 틈(blender/textures.py rattan과 같은 격자)을
+// 지나 뒤 벽과 수납장 윗면에 닿는 곳을 한 번 계산해 그림으로 깔고 더하기 혼합으로 비춘다.
+const RATTAN = { around: 26, up: 13, strip: 0.30, z0: 0.032, h: 0.32, bulb: 0.16 }; // blender/props.py table_lamp와 같은 값
+const rattanRadius = (t) => 0.035 + 0.065 * Math.sin(Math.PI * Math.min(t ** 0.85 * 1.02, 1)) ** 0.75 + 0.015 * (1 - t);
+
+// 전구에서 (bx, by, bz) 방향(Blender 축, 램프 바닥 중심 기준)으로 나간 빛이 갓을 통과하면 1, 막히면 0.
+function rattanPass(dx, dy, dz) {
+  const { z0, h, bulb } = RATTAN;
+  for (let s = 0.002; s < 0.3; s += 0.002) {
+    const x = dx * s, y = dy * s, z = bulb + dz * s;
+    const t = (z - z0) / h;
+    if (t < 0 || t > 1) return Math.hypot(x, y) > 0.055 || z > 0 ? 1 : 0; // 위아래 입으로 나감(아래는 받침에 막힘)
+    if (Math.hypot(x, y) >= rattanRadius(t)) {
+      const u = (Math.atan2(y, x) / (2 * Math.PI) + 1) % 1;
+      const a = (u * RATTAN.around + t * RATTAN.up) % 1, b = (((u * RATTAN.around - t * RATTAN.up) % 1) + 1) % 1;
+      return Math.abs(a - 0.5) < RATTAN.strip || Math.abs(b - 0.5) < RATTAN.strip ? 0 : 1;
+    }
+  }
+  return 1;
+}
+
+// 평면 하나(Blender 좌표의 원점 o와 두 변 ex, ey, 법선 n)에 빛 무늬 그림을 굽는다.
+function rattanPattern(lamp, o, ex, ey, n, w, h) {
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const g = canvas.getContext("2d");
+  const img = g.createImageData(w, h);
+  for (let j = 0; j < h; j++) {
+    for (let i = 0; i < w; i++) {
+      const fx = (i + 0.5) / w, fy = 1 - (j + 0.5) / h;
+      const px = o[0] + ex[0] * fx + ey[0] * fy, py = o[1] + ex[1] * fx + ey[1] * fy, pz = o[2] + ex[2] * fx + ey[2] * fy;
+      const dx = px - lamp[0], dy = py - lamp[1], dz = pz - (lamp[2] + RATTAN.bulb);
+      const d = Math.hypot(dx, dy, dz);
+      const cos = Math.max(0, -(dx * n[0] + dy * n[1] + dz * n[2]) / d);
+      const v = rattanPass(dx / d, dy / d, dz / d) * Math.min(1, ((0.05 / (d * d)) * cos) ** 0.7);
+      const k = (j * w + i) * 4;
+      img.data[k] = img.data[k + 1] = img.data[k + 2] = 255;
+      img.data[k + 3] = Math.round(255 * Math.min(1, v));
+    }
+  }
+  g.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const mat = new THREE.MeshBasicMaterial({ map: tex, color: 0xffb066, transparent: true, opacity: 0, blending: THREE.AdditiveBlending,
+    depthWrite: false, toneMapped: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 });
+  const mesh = new THREE.Mesh(new THREE.BufferGeometry(), mat);
+  // 네 모서리(Blender → three 좌표)로 평면을 만든다
+  const corner = (fx, fy) => B(o[0] + ex[0] * fx + ey[0] * fy, o[1] + ex[1] * fx + ey[1] * fy, o[2] + ex[2] * fx + ey[2] * fy);
+  const pts = [corner(0, 0), corner(1, 0), corner(1, 1), corner(0, 1)];
+  mesh.geometry.setFromPoints([pts[0], pts[1], pts[2], pts[0], pts[2], pts[3]]);
+  mesh.geometry.setAttribute("uv", new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1], 2));
+  mesh.renderOrder = 1;
+  scene.add(mesh);
+  return mesh;
+}
+
+function setupRattanLight(node) {
+  const sw = switches.find((s) => s.glow.some((m) => m.name === "rattan_shade"));
+  if (!node || !sw) return;
+  const box = new THREE.Box3().setFromObject(node);
+  const c = box.getCenter(new THREE.Vector3());
+  const lamp = [c.x, -c.z, box.min.y]; // Blender 좌표: 램프 바닥 중심
+  const wallY = 1.4 - 0.003, top = box.min.y + 0.002; // 뒤 벽 안쪽 면, 수납장 윗면
+  sw.patterns = [
+    rattanPattern(lamp, [lamp[0] - 0.55, wallY, top], [1.1, 0, 0], [0, 0, 0.85], [0, -1, 0], 440, 340),
+    rattanPattern(lamp, [lamp[0] - 0.42, 0.97, top], [0.84, 0, 0], [0, wallY - 0.97, 0], [0, 0, 1], 420, 210),
+  ];
 }
 
 // 로봇 청소기: 누르거나 가끔 저절로 충전대를 떠나 바닥 세 곳을 돌며 제자리에서 한 바퀴씩 돌고, 충전대로 후진해 들어간다.

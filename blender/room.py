@@ -71,7 +71,7 @@ def layout(m, night, col, rack_root, cable_mats):
     props.wall_screen(m, "screen_grafana", (1.17, Y1 - 0.035, 1.47), 0, col,
                       image("tex_dashboard", 640, 360, tx.dashboard()), "GRAFANA CLOUD")
     props.cabinet(m, "cabinet", (1.18, Y1 - 0.22, 0), 0, col)
-    props.tablet(m, "screen_sentry", (0.98, Y1 - 0.24, 0.52), -12, col, image("tex_issues", 300, 200, tx.issues()), "SENTRY")
+    props.speaker(m, (0.99, Y1 - 0.22, 0.52), -12, col)
     props.plant(m, "plant_cabinet", (1.46, Y1 - 0.22, 0.52), col, height=0.2, pot=3, seed=8)
     props.table_lamp(m, "table_lamp", (0.80, Y1 - 0.20, 0.52), col)
     props.sconce(m, "sconce", (-0.13, Y1 - 0.021, 1.72), 0, col)

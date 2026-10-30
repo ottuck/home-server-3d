@@ -74,19 +74,6 @@ def code(w=480, h=300, seed=3):
     return a
 
 
-def issues(w=300, h=200):
-    """오류 추적 화면 느낌의 목록(장식)."""
-    a = canvas(w, h, (0.10, 0.08, 0.14))
-    rect(a, 0, h - 28, w, h, (0.20, 0.14, 0.30))
-    rect(a, 12, h - 19, 90, h - 10, (0.92, 0.90, 0.95))
-    for i in range(5):
-        y = h - 52 - i * 30
-        rect(a, 12, y, w - 12, y + 22, (0.15, 0.12, 0.20))
-        rect(a, 20, y + 8, 28, y + 16, (0.35, 0.85, 0.45))
-        rect(a, 38, y + 9, 38 + 60 + 25 * (i % 3), y + 15, (0.80, 0.78, 0.86))
-    return a
-
-
 def wood_planks(room_w, room_d, ppm=420, row=0.15, seed=5):
     """나무 바닥 판자(sRGB). 폭 room_w·깊이 room_d(m) 전체를 한 장에 그린다."""
     rng = np.random.default_rng(seed)

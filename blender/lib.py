@@ -153,6 +153,40 @@ def mesh(name, verts, faces, loc, material, smooth=True, parent=None, col=None, 
     return _finish(ob, material, 0.0, 0, parent, col)
 
 
+def lathe(name, profile, loc, material, segments=48, sharp=35, parent=None, col=None):
+    """(반지름, 높이) 단면을 Z축으로 돌린 닫힌 메시(화분·컵). 단면은 아래 중심에서 시작해 바깥 벽,
+    테두리, 안쪽 벽을 거쳐 다시 중심에서 끝난다. sharp도보다 꺾인 모서리는 매끈하게 섞지 않는다."""
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    rings = []
+    for r, z in profile:
+        if r < 1e-6:
+            rings.append([bm.verts.new((0, 0, z))])
+        else:
+            rings.append([bm.verts.new((r * math.cos(2 * math.pi * i / segments), r * math.sin(2 * math.pi * i / segments), z))
+                          for i in range(segments)])
+    for a, b in zip(rings, rings[1:]):
+        for i in range(segments):
+            j = (i + 1) % segments
+            if len(a) == 1:
+                bm.faces.new((a[0], b[i], b[j]))
+            elif len(b) == 1:
+                bm.faces.new((a[i], a[j], b[0]))
+            else:
+                bm.faces.new((a[i], a[j], b[j], b[i]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    for f in bm.faces:
+        f.smooth = True
+    for e in bm.edges:
+        if e.is_manifold and e.calc_face_angle(0) > math.radians(sharp):
+            e.smooth = False
+    bm.to_mesh(me)
+    bm.free()
+    ob = bpy.data.objects.new(name, me)
+    ob.location = loc
+    return _finish(ob, material, 0.0, 0, parent, col)
+
+
 def screen_plane(name, w, h, loc, material, rot=None, parent=None, col=None):
     """-Y를 보는 UV 있는 사각형(화면·창밖 풍경)."""
     me = bpy.data.meshes.new(name)

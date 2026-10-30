@@ -5,7 +5,7 @@ import math
 
 import numpy as np
 
-from lib import box, cable, cone, cyl, empty, mat, mesh, screen_mat, screen_plane, sphere, text
+from lib import box, cable, cone, cyl, empty, lathe, mat, mesh, screen_mat, screen_plane, sphere, text
 
 R = math.radians
 
@@ -68,20 +68,48 @@ def _leaf(name, length, width, elev, droop, yaw, base, material, root, col):
     return mesh(name, verts, faces, base, material, rot=(0, 0, yaw), parent=root, col=col)
 
 
+def planter(m, name, style, pr, ph, root, col):
+    """화분 네 가지(테라코타, 크림, 세이지, 차콜). 벽 두께와 테두리가 보이게 단면을 돌려 만든다. 흙 윗면 높이를 돌려준다."""
+    mt = m.pots[style % len(m.pots)]
+    s = style % 4
+    if s == 0:  # 받침 접시 위의 테라코타: 위쪽에 두꺼운 띠
+        lathe(f"{name}_saucer", [(0, 0), (pr * 0.92, 0), (pr * 0.97, 0.016), (pr * 0.93, 0.018), (pr * 0.86, 0.007), (0, 0.007)],
+              (0, 0, 0), mt, parent=root, col=col)
+        prof = [(0, 0.007), (pr * 0.70, 0.007), (pr * 0.73, 0.013), (pr * 0.86, ph * 0.76), (pr * 0.97, ph * 0.78), (pr, ph * 0.8),
+                (pr, ph), (pr * 0.92, ph), (pr * 0.88, ph * 0.9), (0, ph * 0.9)]
+        inner = pr * 0.88
+    elif s == 1:  # 둥근 배와 좁은 입의 도자기
+        prof = [(0, 0), (pr * 0.58, 0), (pr * 0.64, 0.008), (pr * 0.92, ph * 0.3), (pr, ph * 0.58), (pr * 0.93, ph * 0.86),
+                (pr * 0.84, ph * 0.96), (pr * 0.86, ph), (pr * 0.78, ph), (pr * 0.76, ph * 0.9), (0, ph * 0.9)]
+        inner = pr * 0.76
+    elif s == 2:  # 굽이 있고 위로 살짝 벌어지는 원통
+        prof = [(0, 0), (pr * 0.80, 0), (pr * 0.82, 0.01), (pr * 0.79, 0.014), (pr * 0.84, 0.02), (pr * 0.97, ph * 0.97), (pr, ph),
+                (pr * 0.91, ph), (pr * 0.89, ph * 0.9), (0, ph * 0.9)]
+        inner = pr * 0.89
+    else:  # 곧은 원통, 얇은 테두리
+        prof = [(0, 0), (pr * 0.86, 0), (pr * 0.93, 0.012), (pr * 0.95, ph), (pr * 0.90, ph), (pr * 0.89, ph * 0.9), (0, ph * 0.9)]
+        inner = pr * 0.89
+    lathe(f"{name}_pot", prof, (0, 0, 0), mt, parent=root, col=col)
+    soil = ph * 0.9
+    # 흙은 가운데가 살짝 볼록하다
+    lathe(f"{name}_soil", [(0, soil - 0.004), (inner * 0.99, soil - 0.004), (inner * 0.99, soil + 0.002), (inner * 0.6, soil + 0.006),
+                           (0, soil + 0.008)], (0, 0, 0), m.soil, parent=root, col=col)
+    return soil
+
+
 def plant(m, name, loc, col, height=1.0, pot=0, seed=1, rotz=0):
     rng = np.random.default_rng(seed)
     root = _root(name, loc, rotz, col)
     pr = 0.09 + 0.08 * height
     ph = 0.12 + 0.18 * height
-    cone(f"{name}_pot", pr * 0.78, pr, ph, (0, 0, 0), m.pots[pot % len(m.pots)], segments=32, bevel=0.006, parent=root, col=col)
-    cyl(f"{name}_soil", pr * 0.92, 0.01, (0, 0, ph - 0.012), m.soil, segments=32, parent=root, col=col)
+    soil = planter(m, name, pot, pr, ph, root, col)
     count = int(8 + 10 * height)
     for i in range(count):
         yaw = rng.uniform(0, 2 * math.pi)
         stem_h = ph + rng.uniform(0.05, 0.55) * height
         lean = rng.uniform(0.01, 0.06) * (1 + height)
         bx, by = -math.sin(yaw) * lean, math.cos(yaw) * lean
-        cable(f"{name}_stem_{i}", [(0, 0, ph - 0.01), (bx * 0.5, by * 0.5, (ph + stem_h) / 2), (bx, by, stem_h)],
+        cable(f"{name}_stem_{i}", [(0, 0, soil), (bx * 0.5, by * 0.5, (ph + stem_h) / 2), (bx, by, stem_h)],
               0.0025 + 0.002 * height, m.stem, parent=root, col=col)
         _leaf(f"{name}_leaf_{i}", rng.uniform(0.10, 0.17) * (0.6 + 0.6 * height), rng.uniform(0.045, 0.07) * (0.7 + 0.5 * height),
               R(rng.uniform(15, 55)), rng.uniform(1.0, 3.5) / (0.6 + height), yaw, (bx, by, stem_h),
@@ -115,20 +143,33 @@ def keyboard(m, name, loc, root, col):
 
 
 def mug(m, name, loc, root, col, material=None):
+    """속이 빈 머그. 굽, 둥근 아래쪽, 테두리 두께가 보이고 커피는 테두리보다 조금 아래에 있다."""
     r = empty(name, loc, parent=root, col=col)
-    cyl(f"{name}_cup", 0.035, 0.085, (0, 0, 0.0425), material or m.ivory, segments=24, bevel=0.006, parent=r, col=col)
-    cyl(f"{name}_coffee", 0.031, 0.002, (0, 0, 0.078), m.wood_dark, segments=24, parent=r, col=col)
-    cable(f"{name}_handle", [(0.033, 0, 0.065), (0.058, 0, 0.055), (0.058, 0, 0.03), (0.033, 0, 0.022)], 0.006, material or m.ivory, parent=r, col=col)
+    mt = material or m.ivory
+    lathe(f"{name}_cup", [(0, 0.004), (0.026, 0.0), (0.030, 0.0), (0.033, 0.005), (0.035, 0.016), (0.036, 0.080), (0.0355, 0.085),
+                          (0.0325, 0.085), (0.032, 0.080), (0.031, 0.020), (0.026, 0.012), (0, 0.011)], (0, 0, 0), mt, parent=r, col=col)
+    lathe(f"{name}_coffee", [(0, 0.064), (0.0315, 0.064), (0.0315, 0.068), (0, 0.068)], (0, 0, 0), m.wood_dark, parent=r, col=col)
+    cable(f"{name}_handle", [(0.033, 0, 0.068), (0.057, 0, 0.064), (0.059, 0, 0.036), (0.034, 0, 0.026)], 0.0065, mt, parent=r, col=col)
 
 
 def desk_lamp(m, name, loc, rotz, root, col):
+    """구스넥 책상 스탠드. 갓의 좁은 쪽(목)이 팔 끝에 붙고, 넓은 입은 앞(-Y) 아래를 향한다."""
     r = empty(name, loc, parent=root, col=col)
     r.rotation_euler = (0, 0, R(rotz))
     cyl(f"{name}_base", 0.075, 0.018, (0, 0, 0.009), m.black_metal, segments=32, bevel=0.005, parent=r, col=col)
-    cable(f"{name}_arm", [(0, 0, 0.015), (0.0, 0.03, 0.28), (0.0, -0.10, 0.42)], 0.007, m.black_metal, parent=r, col=col)
-    shade = cone(f"{name}_shade", 0.085, 0.03, 0.11, (0, -0.15, 0.36), m.black_metal, segments=32, bevel=0.003, parent=r, col=col)
-    shade.rotation_euler = (R(160), 0, 0)
-    sphere(f"{name}_bulb", 0.025, (0, -0.155, 0.355), m.bulb, parent=r, col=col)
+    cyl(f"{name}_foot", 0.016, 0.02, (0, 0, 0.028), m.brass, segments=20, parent=r, col=col)
+    tip = (0.0, -0.10, 0.43)
+    cable(f"{name}_arm", [(0, 0, 0.03), (0.0, 0.05, 0.27), tip], 0.007, m.black_metal, parent=r, col=col)
+    # 갓 축: 위·뒤(+Y)로 25° 기운 방향. 원뿔의 좁은 끝이 정확히 팔 끝에 오도록 놓는다.
+    tilt = R(-25)
+    axis = (0.0, -math.sin(tilt), math.cos(tilt))
+    depth = 0.11
+    base = tuple(t - depth * a for t, a in zip(tip, axis))
+    shade = cone(f"{name}_shade", 0.085, 0.026, depth, base, m.black_metal, segments=40, bevel=0.002, parent=r, col=col, caps=False)
+    shade.rotation_euler = (tilt, 0, 0)
+    neck = cyl(f"{name}_neck", 0.02, 0.03, tuple(t - 0.008 * a for t, a in zip(tip, axis)), m.brass, segments=20, parent=r, col=col)
+    neck.rotation_euler = (tilt, 0, 0)
+    sphere(f"{name}_bulb", 0.024, tuple(b + 0.035 * a for b, a in zip(base, axis)), m.bulb, parent=r, col=col)
 
 
 def desk(m, name, loc, rotz, col, screen):
@@ -333,15 +374,16 @@ def wall_screen(m, name, loc, rotz, col, img, label, w=0.96, h=0.56):
     return root
 
 
-def tablet(m, name, loc, rotz, col, img, label):
-    root = _root(name, loc, rotz, col)
-    box(f"{name}_foot", (0.14, 0.10, 0.012), (0, 0.03, 0.006), m.black_metal, bevel=0.004, parent=root, col=col)
-    t = empty(f"{name}_tilt", (0, 0.03, 0.03), parent=root, col=col)
-    t.rotation_euler = (R(-15), 0, 0)
-    box(f"{name}_body", (0.26, 0.016, 0.18), (0, 0.01, 0.09), m.charcoal, bevel=0.008, parent=t, col=col)
-    smat = screen_mat(f"{name}_screen_mat", img, strength=m.screen_boost)
-    screen_plane(f"{name}_screen", 0.24, 0.16, (0, 0.0015, 0.09), smat, parent=t, col=col)
-    text(f"{name}_label", label, 0.016, (0, -0.045, 0.006), m.label, rot=(0, 0, 0), parent=root, col=col)
+def speaker(m, loc, rotz, col):
+    """수납장 위 북셸프 스피커(호두나무 통, 크림색 패브릭 앞판). 웹에서 누르면 음악에 맞춰 들썩이는 부분(part__)이다."""
+    root = empty("part__speaker", loc, col=col)
+    root.rotation_euler = (0, 0, R(rotz))
+    box("speaker_cabinet", (0.15, 0.14, 0.23), (0, 0, 0.123), m.wood_dark, bevel=0.012, parent=root, col=col)
+    box("speaker_grille", (0.128, 0.006, 0.205), (0, -0.069, 0.123), m.fabric, bevel=0.004, parent=root, col=col)
+    cyl("speaker_badge", 0.006, 0.003, (0, -0.0735, 0.036), m.brass, axis="Y", segments=16, parent=root, col=col)
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            cyl(f"speaker_foot_{sx}_{sy}", 0.009, 0.008, (sx * 0.055, sy * 0.05, 0.004), m.charcoal, segments=16, parent=root, col=col)
     return root
 
 

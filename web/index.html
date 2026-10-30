@@ -61,6 +61,11 @@
     .commit-h span:first-child { color: var(--accent); font-weight: 600; }
     .commit-m { font-size: 12px; margin-top: 2px; overflow-wrap: anywhere; }
     .note a { color: var(--accent); text-decoration: none; }
+    .music { position: absolute; transform: translate(-50%, -100%); font-size: 16px; color: var(--accent);
+      text-shadow: 0 1px 4px rgba(0,0,0,.15); animation: music 2s ease-out forwards; }
+    @keyframes music { from { opacity: 0; translate: 0 0; } 15% { opacity: 1; } to { opacity: 0; translate: var(--dx) -46px; } }
+    .keys { margin-top: 4px; }
+    @media (hover: none) { .keys { display: none; } }
     .legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; color: var(--sub); margin-top: 16px; }
     .legend span { display: flex; align-items: center; gap: 4px; }
     .note { font-size: 11px; color: var(--sub); margin-top: 10px; }
@@ -129,7 +134,8 @@
         <span><i class="dot ok"></i>정상</span><span><i class="dot warn"></i>주의</span>
         <span><i class="dot error"></i>오류</span><span><i class="dot unknown"></i>데이터 없음</span>
       </div>
-      <div class="note">랙이나 모니터를 누르면 가까이서 볼 수 있고, 조명·블라인드·의자·책·청소기도 눌러 볼 수 있어요. 랙 하나가 서버 한 대, LED 하나가 컨테이너 하나입니다.</div>
+      <div class="note">랙이나 모니터를 누르면 가까이서 볼 수 있고, 조명·블라인드·의자·책·스피커·청소기도 눌러 볼 수 있어요. 랙 하나가 서버 한 대, LED 하나가 컨테이너 하나입니다.</div>
+      <div class="note keys">키보드: 방향키·WASD 이동 · Q/E 회전 · +/- 확대 · Space+드래그 이동 · Esc 처음으로</div>
     </aside>
   </div>
   <div class="tip" id="tip"></div>

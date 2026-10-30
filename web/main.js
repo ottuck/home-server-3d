@@ -486,7 +486,64 @@ function placeTags() {
 }
 
 $("back").onclick = home;
-addEventListener("keydown", (e) => e.key === "Escape" && (focused || screenFocus) && home());
+addEventListener("keydown", (e) => e.key === "Escape" && home()); // 어디를 보고 있든 방 전체로 돌아간다
+
+// ---------------------------------------------------------------- 키보드로 카메라 움직이기
+// 방향키·WASD 이동, Q/E 좌우 회전, +/- 확대. Space를 누른 채 끌면 디자인 도구처럼 화면을 옮긴다.
+const PAN_KEYS = { arrowleft: [-1, 0], a: [-1, 0], arrowright: [1, 0], d: [1, 0], arrowup: [0, 1], w: [0, 1], arrowdown: [0, -1], s: [0, -1] };
+const MOVE_KEYS = new Set([...Object.keys(PAN_KEYS), "q", "e", "+", "=", "-", "_"]);
+const held = new Set();
+let spaceHeld = false;
+
+function setSpace(on) {
+  spaceHeld = on;
+  controls.mouseButtons.LEFT = on ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE;
+  renderer.domElement.style.cursor = on ? "grab" : "";
+}
+addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (e.code === "Space") setSpace(true);
+  else if (MOVE_KEYS.has(k)) held.add(k);
+  else return;
+  e.preventDefault();
+});
+addEventListener("keyup", (e) => (e.code === "Space" ? setSpace(false) : held.delete(e.key.toLowerCase())));
+addEventListener("blur", () => {
+  held.clear();
+  setSpace(false);
+});
+
+const sph = new THREE.Spherical();
+function stepKeys(dt) {
+  if (!held.size) return;
+  anim = null; // 다가가는 중이면 멈추고 키를 따른다
+  dt = Math.min(dt, 0.05);
+  let dx = 0, dy = 0, rot = 0, zoom = 0;
+  for (const k of held) {
+    if (PAN_KEYS[k]) [dx, dy] = [dx + PAN_KEYS[k][0], dy + PAN_KEYS[k][1]];
+    if (k === "q") rot -= 1;
+    if (k === "e") rot += 1;
+    if (k === "+" || k === "=") zoom += 1;
+    if (k === "-" || k === "_") zoom -= 1;
+  }
+  // 화면 기준 초당 1.8m, 확대할수록 천천히. 방 밖으로 나가지 않게 묶는 것은 controls의 change 처리가 한다.
+  const step = (1.8 * dt) / camera.zoom;
+  const move = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0).multiplyScalar(dx * step)
+    .addScaledVector(new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1), dy * step);
+  camera.position.add(move);
+  controls.target.add(move);
+  if (rot) {
+    const off = camera.position.clone().sub(controls.target);
+    sph.setFromVector3(off);
+    sph.theta = THREE.MathUtils.clamp(sph.theta + rot * 1.2 * dt, controls.minAzimuthAngle, controls.maxAzimuthAngle);
+    camera.position.copy(controls.target).add(off.setFromSpherical(sph));
+  }
+  if (zoom) {
+    camera.zoom = THREE.MathUtils.clamp(camera.zoom * Math.exp(zoom * 1.5 * dt), controls.minZoom, controls.maxZoom);
+    camera.updateProjectionMatrix();
+  }
+}
 
 // ---------------------------------------------------------------- 조명 스위치, 고양이
 
@@ -637,10 +694,10 @@ function stepVacuum(t) {
   }
 }
 
-// 눌러서 움직이는 소품: 책 덮개, 안락의자 쿠션, 의자 윗부분, 블라인드.
+// 눌러서 움직이는 소품: 책 덮개, 안락의자 쿠션, 의자 윗부분, 스피커, 블라인드.
 // 보통은 value가 target을 따라가며(빠르게 시작해 천천히 멈춘다), spring이 있으면 0으로 돌아오는 감쇠 진동을 한다.
-// apply가 그 값으로 모양을 바꾼다.
-const toys = []; // { label, pick: Object3D[], click(toy), apply(value), rate | spring: [강성, 감쇠], target, value, vel }
+// apply가 그 값(과 시각)으로 모양을 바꾼다.
+const toys = []; // { label, pick: Object3D[], click(toy), apply(value, t), rate | spring: [강성, 감쇠], target, value, vel }
 let blinds = null;
 const WIN_BOTTOM = 0.80; // 창 아래 끝 높이(blender/room.py WIN)
 
@@ -677,6 +734,21 @@ function setupToys(root) {
       click: (t) => (t.target += 2 * Math.PI), apply: (k) => (top.rotation.y = k) });
   }
 
+  const speaker = get("part__speaker");
+  if (speaker) {
+    // 음악이 흐르는 셈 치고 120bpm 박자에 맞춰 통이 들썩이고 음표가 떠오른다. 소리는 내지 않는다.
+    let nextNote = 0;
+    add({ label: "스피커", pick: [speaker], rate: 6, click: flip,
+      apply: (k, t) => {
+        const beat = k * Math.max(0, Math.sin(t * Math.PI * 4)) ** 4;
+        speaker.scale.set(1 + 0.012 * beat, 1 + 0.035 * beat, 1 + 0.012 * beat);
+        if (k > 0.5 && t > nextNote) {
+          floatNote(speaker);
+          nextNote = t + 0.45 + Math.random() * 0.35;
+        }
+      } });
+  }
+
   const slats = [];
   for (let i = 0, o; (o = get(`part__blind_${String(i).padStart(2, "0")}`)); i++) slats.push(o);
   const bar = get("part__blind_bottom");
@@ -696,7 +768,20 @@ function setupToys(root) {
   }
 }
 
-function stepToys(dt) {
+function floatNote(obj) {
+  const box = new THREE.Box3().setFromObject(obj);
+  v.set((box.min.x + box.max.x) / 2, box.max.y + 0.02, (box.min.z + box.max.z) / 2).project(camera);
+  const el = document.createElement("div");
+  el.className = "music";
+  el.textContent = Math.random() < 0.5 ? "♪" : "♫";
+  el.style.left = `${((v.x + 1) / 2) * stage.clientWidth}px`;
+  el.style.top = `${((1 - v.y) / 2) * stage.clientHeight}px`;
+  el.style.setProperty("--dx", `${Math.round((Math.random() - 0.5) * 40)}px`);
+  el.onanimationend = () => el.remove();
+  $("tags").append(el);
+}
+
+function stepToys(dt, t) {
   dt = Math.min(dt, 0.1); // 탭을 오래 비웠다 돌아와도 튀지 않게
   for (const toy of toys) {
     if (toy.spring) {
@@ -708,7 +793,7 @@ function stepToys(dt) {
     } else {
       toy.value += (toy.target - toy.value) * Math.min(1, dt * toy.rate);
     }
-    toy.apply(toy.value);
+    toy.apply(toy.value, t);
   }
   // 블라인드를 내리면 창으로 드는 빛이 줄어든다
   windowLight.intensity = THEMES[theme].window * (1 - 0.75 * (blinds?.value ?? 0));
@@ -794,7 +879,7 @@ function showTip(e, html) {
 renderer.domElement.addEventListener("pointermove", (e) => {
   if (!infra || !rack || e.buttons) return (tip.style.display = "none");
   const hit = pick(e, pickables());
-  renderer.domElement.style.cursor = hit ? "pointer" : "";
+  renderer.domElement.style.cursor = spaceHeld ? "grab" : hit ? "pointer" : "";
   // 소품은 이름표 없이 눌렀을 때 움직이는 것으로 충분하다(손가락 커서만 바꾼다)
   if (switchOf(hit) || toyOf(hit) || (hit && isVacuum(hit.object))) return (tip.style.display = "none");
   if (onMonitor(hit)) return showTip(e, "<b>Grafana Cloud</b><div class=\"row muted\">최근 1시간 서버 지표 · 눌러서 크게 보기</div>");
@@ -815,7 +900,7 @@ renderer.domElement.addEventListener("pointerleave", () => (tip.style.display = 
 let down = null;
 renderer.domElement.addEventListener("pointerdown", (e) => (down = [e.clientX, e.clientY]));
 renderer.domElement.addEventListener("pointerup", (e) => {
-  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 6 || !rack) return;
+  if (!down || spaceHeld || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 6 || !rack) return;
   const hit = pick(e, pickables());
   const sw = switchOf(hit);
   if (sw) {
@@ -846,9 +931,8 @@ let lastT = 0;
 renderer.setAnimationLoop(() => {
   const t = clock.getElapsedTime();
   stepSwitches(t - lastT);
-  stepToys(t - lastT);
+  stepToys(t - lastT, t);
   stepVacuum(t);
-  lastT = t;
   const base = THEMES[theme].led;
   for (const led of leds.values()) {
     // 오류는 깜박이고, 데이터 없음은 꺼진 것처럼 어둡게 둔다.
@@ -856,7 +940,9 @@ renderer.setAnimationLoop(() => {
       : led.status === "unknown" ? 0.12 : 1;
     led.mesh.material.emissiveIntensity = base * k;
   }
+  stepKeys(t - lastT);
   stepAnim(t);
+  lastT = t;
   controls.update();
   placeTags();
   composer.render();

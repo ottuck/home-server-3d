@@ -3,7 +3,7 @@
 // cAdvisor 라벨·호스트 이름·IP·쿼리는 절대 내보내지 않는다.
 import infra from "../../shared/infra.json";
 import { cachedJson } from "../_lib/cache.js";
-import { CAD, UNIX, prom, round, tag } from "../_lib/prom.js";
+import { configured, prom, round, selectors, tag } from "../_lib/prom.js";
 
 const TTL = 60; // 초. 캐시 기간
 const FAIL_TTL = 10; // 초. 조회 실패 응답은 짧게만 캐시해 곧 다시 시도한다.
@@ -12,12 +12,12 @@ const RESTART_WINDOW = 600; // 초. 최근 10분 안에 (재)시작했으면 주
 const MEM_WARN = 0.9; // 메모리 한도 대비 사용률. (container_oom_events_total은 이 서버에서 믿을 수 없어 쓰지 않는다)
 
 // cAdvisor container 라벨 → 공개 id. 라벨은 공개 저장소에 두지 않고 Secret CONTAINER_SOURCES({공개 id: 라벨} JSON)로 받는다.
-// infra.json에 있는 공개 id만 쓴다.
+// infra.json에 있는 공개 id만 쓴다. CONTAINER_SOURCES가 없으면 공개 id를 그대로 컨테이너 이름으로 본다.
 const PUBLIC_IDS = new Set(infra.units.flatMap((u) => (u.containers ?? []).map((c) => c.id)));
 let sourceToId = null;
 function sources(env) {
   if (sourceToId) return sourceToId;
-  const map = JSON.parse(env.CONTAINER_SOURCES || "{}");
+  const map = env.CONTAINER_SOURCES ? JSON.parse(env.CONTAINER_SOURCES) : Object.fromEntries([...PUBLIC_IDS].map((id) => [id, id]));
   const pairs = Object.entries(map).filter(([id, label]) => PUBLIC_IDS.has(id) && typeof label === "string").map(([id, label]) => [label, id]);
   if (!pairs.length) console.error("CONTAINER_SOURCES is missing or empty");
   else sourceToId = new Map(pairs);
@@ -25,7 +25,7 @@ function sources(env) {
 }
 
 // 한 번의 요청으로 모든 신호를 받는다.
-const QUERY = [
+const query = ({ cad: CAD, node: UNIX }) => [
   tag("seen", `time() - max by (container) (timestamp(container_last_seen{${CAD}}))`),
   tag("uptime", `time() - max by (container) (container_start_time_seconds{${CAD}})`),
   tag("mem", `max by (container) (container_memory_working_set_bytes{${CAD}}) / max by (container) (container_spec_memory_limit_bytes{${CAD}} > 0)`),
@@ -37,6 +37,7 @@ const QUERY = [
 ].join(" or ");
 
 export const onRequestGet = cachedJson("/api/status", async (env) => {
+  if (!configured(env)) return { data: { updatedAt: new Date().toISOString(), unconfigured: true, containers: {}, host: {} }, ttl: TTL };
   const data = await buildStatus(env);
   return { data, ttl: Object.keys(data.containers).length ? TTL : FAIL_TTL };
 });
@@ -45,7 +46,7 @@ async function buildStatus(env) {
   const updatedAt = new Date().toISOString();
   let series;
   try {
-    series = await prom(env, "query", { query: QUERY });
+    series = await prom(env, "query", { query: query(selectors(env)) });
   } catch (e) {
     console.error("status query failed:", e.message); // Pages 로그에만 남는다.
     // 조회 실패: 모든 컨테이너를 "데이터 없음"으로 둔다.

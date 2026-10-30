@@ -66,6 +66,33 @@ shared/      장비·컨테이너 목록 (Blender, 웹, 상태 API가 함께 읽
 docs/        설계 기록, 구성도, 렌더 이미지
 ```
 
+## 내 서버로 쓰기
+
+이 저장소를 포크해서 내 서버의 서버실로 바꿀 수 있습니다. 비밀 값을 넣기 전에는 예시 데이터로 돌아가므로, 배포부터 해 두고 하나씩 채워도 됩니다.
+
+1. **장비 목록 고치기.** [`shared/infra.json`](shared/infra.json)에 서버 이름(`host`), 랙에 꽂을 장비(`units`), GitHub 아이디(`site.github`)를 적습니다.
+   - 장비 하나가 서비스 하나이고, `containers`의 항목 하나가 LED 하나입니다.
+   - `kind`는 `server`, `switch`, `patch`, `blank`, `ups` 중 하나입니다. 장비 높이(`u`)의 합은 `host.rackUnits`(기본 22) 이하로 둡니다. 남는 칸은 빈 패널로 채워집니다.
+   - 컨테이너 `id`는 화면과 API에 그대로 나오는 공개 이름입니다. 실제 Docker 컨테이너 이름과 같으면 따로 연결할 필요가 없습니다.
+   - `site.github`를 비워 두면 책상 모니터에 예시 커밋이 나옵니다.
+2. **장비를 바꿨다면 3D 장면 다시 만들기.** 랙은 장비 목록을 읽어 Blender에서 만들어지므로, 장비를 바꾸면 GLB를 다시 내보내야 합니다(아래 "3D 장면 다시 만들기"). 서버 이름이나 GitHub 아이디만 바꿨다면 필요 없습니다.
+3. **Cloudflare Pages에 연결하기.** Cloudflare 대시보드에서 포크한 저장소로 Pages 프로젝트를 만들고 아래처럼 설정합니다. 이후로는 push할 때마다 자동으로 배포됩니다.
+   - 빌드 명령: `node web/sync.mjs`
+   - 빌드 출력 디렉터리: `web`
+4. **실제 지표 연결하기(선택).** 서버에서 [Grafana Alloy](https://grafana.com/docs/alloy/)로 node exporter(호스트)와 cAdvisor(컨테이너) 지표를 Grafana Cloud에 보내고 있어야 합니다. Pages 프로젝트의 환경 변수(Secret)에 다음 값을 넣습니다.
+
+   | 이름 | 필수 | 값 |
+   | --- | --- | --- |
+   | `GRAFANA_PROM_URL` | 예 | Grafana Cloud Prometheus 주소(`https://prometheus-prod-…grafana.net/api/prom`) |
+   | `GRAFANA_PROM_USER` | 예 | Prometheus 인스턴스 id(숫자) |
+   | `GRAFANA_PROM_TOKEN` | 예 | `metrics:read` 권한만 있는 액세스 정책 토큰 |
+   | `CONTAINER_SOURCES` | 아니오 | 공개 id와 실제 컨테이너 이름이 다를 때 연결표. 예: `{"edge-caddy":"caddy"}` |
+   | `PROM_CADVISOR_SELECTOR` | 아니오 | 컨테이너 지표를 고르는 라벨. 기본값 `job="integrations/cadvisor"` |
+   | `PROM_NODE_SELECTOR` | 아니오 | 호스트 지표를 고르는 라벨. 기본값 `job="integrations/unix"` |
+   | `GITHUB_TOKEN` | 아니오 | GitHub API 호출 한도가 부족할 때 |
+
+5. **링크 미리보기 주소 바꾸기.** [`web/index.html`](web/index.html) 위쪽의 `og:url`, `og:image`를 내 도메인으로 바꿉니다.
+
 ## 로컬에서 실행하기
 
 먼저 GLB·텍스처와 장비 목록을 `web/data/`로 복사합니다.
@@ -80,7 +107,7 @@ node web/sync.mjs
 npx serve web
 ```
 
-상태 API까지 함께 띄우려면 저장소 루트에서 Wrangler를 실행합니다. 실제 값을 받으려면 `.dev.vars.example`을 `.dev.vars`로 복사해 Grafana Cloud 읽기 전용 토큰을 넣어야 합니다. 토큰이 없으면 모든 LED가 회색으로 나옵니다. 어느 경우든 주소에 `?demo=1`을 붙이면 예시 데이터를 볼 수 있습니다.
+상태 API까지 함께 띄우려면 저장소 루트에서 Wrangler를 실행합니다. 실제 값을 받으려면 `.dev.vars.example`을 `.dev.vars`로 복사해 Grafana Cloud 읽기 전용 토큰을 넣어야 합니다. 토큰이 없으면 예시 데이터로 표시됩니다. 어느 경우든 주소에 `?demo=1`을 붙이면 예시 데이터를 볼 수 있습니다.
 
 ```bash
 npx wrangler pages dev
@@ -88,12 +115,22 @@ npx wrangler pages dev
 
 ## 3D 장면 다시 만들기
 
-Blender 5.2를 화면 없이 실행합니다.
+[Blender 5.2](https://www.blender.org/download/)를 화면 없이 실행합니다. 웹에 쓰는 GLB만 만들 때는 렌더 없이 내보내기만 하므로 GPU가 없어도 금방 끝납니다.
 
 ```bash
-blender -b --factory-startup --python blender/build_room.py -- --theme day --out renders/room_day.png --glb assets/scene.glb
+blender -b --factory-startup --python blender/build_room.py -- --glb assets/scene.glb
 ```
 
-밤 렌더는 `--theme night`로 만듭니다. 랙만 따로 만들 때는 `blender/build_rack.py`를 씁니다.
+만든 GLB를 웹으로 복사해 확인한 뒤, `assets/scene.glb`를 커밋하고 push합니다.
+
+```bash
+node web/sync.mjs
+```
+
+README용 그림을 렌더할 때는 `--theme day` 또는 `--theme night`와 `--out renders/room_day.png`를 붙입니다. 랙만 따로 만들 때는 `blender/build_rack.py`를 씁니다.
 
 설계하면서 정한 내용은 [docs/design.md](docs/design.md)에 정리해 두었습니다.
+
+## 라이선스
+
+[MIT](LICENSE). 포크해서 자유롭게 고쳐 쓰셔도 됩니다.

@@ -94,6 +94,7 @@ Cloudflare Pages 하나로 정적 웹과 `GET /api/status`를 함께 낸다. Lig
 
 - **조회:** Grafana Cloud Prometheus를 읽기 전용 토큰(scope `metrics:read`)으로 부른다. 신호 전부를 쿼리 하나로 받는다(`label_replace`로 `q` 라벨을 붙여 구분).
 - **비밀 값:** `GRAFANA_PROM_URL`, `GRAFANA_PROM_USER`, `GRAFANA_PROM_TOKEN`, `CONTAINER_SOURCES`. 로컬은 `.dev.vars`(커밋 금지), 운영은 Pages Secret.
+- **포크해서 쓰기:** 개인 값은 `shared/infra.json`(서버 이름, 장비, `site.github`)과 환경 변수로만 받는다. Grafana 값 셋 중 하나라도 없으면 상태·기록 API가 `unconfigured`를 알리고 웹은 예시 데이터를 쓴다(`site.github`가 비면 커밋도 예시). `CONTAINER_SOURCES`가 없으면 공개 id를 컨테이너 이름으로 보고, 지표 선택자는 `PROM_CADVISOR_SELECTOR`·`PROM_NODE_SELECTOR`로 바꿀 수 있다. 라이선스는 MIT.
 - **캐시:** 60초(Cache API + isolate 메모리). 실패하면 한 번 더 시도하고, 그래도 실패하면 200으로 빈 상태를 10초만 캐시한다.
 - **응답:** `{ updatedAt, containers: { [id]: "ok" | "warn" | "error" }, host: { cpu, mem, disk } }`. 모르는 값은 키를 빼고, 웹은 그 컨테이너를 회색으로 칠한다. 라벨, 호스트 이름, IP, 쿼리는 싣지 않는다.
 

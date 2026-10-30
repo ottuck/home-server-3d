@@ -1,5 +1,8 @@
 {
-  "$comment": "3D 장면·웹·상태 API가 함께 읽는 장비 목록. 컨테이너 id는 공개용 이름(LED 노드 led__<id>, API 키), name은 화면 표시. decor는 실제 장비가 아닌 장식. 실제 cAdvisor container 라벨은 공개 저장소에 두지 않고, 상태 API가 Pages Secret CONTAINER_SOURCES({공개 id: 라벨} JSON)로 받는다.",
+  "$comment": "3D 장면·웹·상태 API가 함께 읽는 장비 목록. 컨테이너 id는 공개용 이름(LED 노드 led__<id>, API 키), name은 화면 표시. decor는 실제 장비가 아닌 장식. 실제 cAdvisor container 라벨은 공개 저장소에 두지 않고, 상태 API가 Pages Secret CONTAINER_SOURCES({공개 id: 라벨} JSON)로 받는다(없으면 id를 컨테이너 이름으로 본다). site.github는 책상 모니터에 커밋을 띄울 GitHub 아이디.",
+  "site": {
+    "github": "ottuck"
+  },
   "host": {
     "title": "AWS Lightsail",
     "subtitle": "Home Server · 2 GB",

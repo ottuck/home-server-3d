@@ -1,9 +1,10 @@
-// GET /api/github: 책상 모니터에 띄우는 공개 저장소의 최근 커밋.
+// GET /api/github: 책상 모니터에 띄우는 공개 저장소의 최근 커밋(사용자는 shared/infra.json site.github).
 // GitHub 커밋 검색 한 번으로 받아 10분 캐시한다. 공개 데이터라 토큰 없이 부르고, GITHUB_TOKEN이 있으면 붙인다.
 // 응답: { updatedAt, user, commits: [{ repo, sha, message, date }] }. 실패하면 commits가 빈 배열이다.
+import infra from "../../shared/infra.json";
 import { cachedJson } from "../_lib/cache.js";
 
-const USER = "ottuck";
+const USER = infra.site?.github; // 비어 있으면 unconfigured를 알리고 웹은 예시 커밋을 보여 준다
 const TTL = 600;
 const FAIL_TTL = 60;
 const LIMIT = 10; // 보여 줄 커밋 수
@@ -11,6 +12,7 @@ const PER_REPO = 4; // 한 저장소가 목록을 다 차지하지 않게
 
 export const onRequestGet = cachedJson("/api/github", async (env) => {
   const updatedAt = new Date().toISOString();
+  if (!USER) return { data: { updatedAt, unconfigured: true, user: null, commits: [] }, ttl: TTL };
   try {
     return { data: { updatedAt, user: USER, commits: await recentCommits(env) }, ttl: TTL };
   } catch (e) {

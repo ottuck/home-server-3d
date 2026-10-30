@@ -12,7 +12,7 @@ export const STATUS_COLOR = {
 //            host: { cpu?, mem?, disk? } (% 숫자, 모르는 값은 키 없음) }
 // 여기에 없는 컨테이너는 "unknown"으로 칠한다. 데이터가 없으면 절대 정상으로 칠하지 않는다.
 // 가짜 상태에는 demo: true가 붙는다(패널이 "예시 데이터"로 표시). 실제 응답에는 없다.
-// ?demo=1이거나, 로컬 정적 서버라 /api/status가 없으면(함수 없이 띄운 경우) 가짜 상태를 쓴다.
+// ?demo=1이거나, 로컬 정적 서버라 /api/status가 없거나(함수 없이 띄운 경우), API가 unconfigured(Secret 없음)를 알리면 가짜 상태를 쓴다.
 const DEMO = new URLSearchParams(location.search).has("demo");
 const LOCAL = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
 
@@ -22,6 +22,7 @@ export async function fetchStatus(infra) {
     const res = await fetch("/api/status");
     if (!res.ok) throw new Error(`status ${res.status}`);
     const s = await res.json();
+    if (s.unconfigured) return fakeStatus(infra); // Grafana Secret을 아직 넣지 않은 배포
     return { updatedAt: s.updatedAt, containers: s.containers ?? {}, host: s.host ?? {} };
   } catch {
     if (LOCAL) return fakeStatus(infra);
@@ -38,6 +39,7 @@ export async function fetchHistory() {
     const res = await fetch("/api/history");
     if (!res.ok) throw new Error(`history ${res.status}`);
     const h = await res.json();
+    if (h.unconfigured) return fakeHistory();
     return { updatedAt: h.updatedAt, start: h.start, step: h.step, series: h.series ?? {} };
   } catch {
     if (LOCAL) return fakeHistory();
@@ -64,6 +66,7 @@ export async function fetchGithub() {
     const res = await fetch("/api/github");
     if (!res.ok) throw new Error(`github ${res.status}`);
     const g = await res.json();
+    if (g.unconfigured) return fakeGithub();
     return { updatedAt: g.updatedAt, user: g.user, commits: g.commits ?? [] };
   } catch {
     if (LOCAL) return fakeGithub();

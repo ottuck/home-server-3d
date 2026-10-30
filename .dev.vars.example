@@ -1,6 +1,11 @@
 # .dev.vars 로 복사해 값을 채운다(커밋 금지).
-GRAFANA_PROM_URL=https://prometheus-prod-41-prod-au-southeast-1.grafana.net/api/prom
-GRAFANA_PROM_USER=3692523
+GRAFANA_PROM_URL=https://prometheus-prod-XX-prod-<region>.grafana.net/api/prom
+GRAFANA_PROM_USER=<Prometheus 인스턴스 id(숫자)>
 GRAFANA_PROM_TOKEN=glc_...
-# 공개 컨테이너 id → 실제 cAdvisor container 라벨(JSON 한 줄)
+# (선택) 공개 컨테이너 id → 실제 cAdvisor container 라벨(JSON 한 줄). 없으면 infra.json의 id를 컨테이너 이름으로 본다.
 CONTAINER_SOURCES={"edge-caddy":"<cAdvisor container 라벨>"}
+# (선택) 지표 선택자. 기본값은 Grafana Alloy 통합의 job 이름
+# PROM_CADVISOR_SELECTOR=job="integrations/cadvisor"
+# PROM_NODE_SELECTOR=job="integrations/unix"
+# (선택) GitHub API 한도가 부족할 때
+# GITHUB_TOKEN=

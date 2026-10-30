@@ -169,7 +169,7 @@ let github = null;
 let rack = null;
 let infra = null;
 let status = null;
-globalThis.viewer = { leds, units, mats, scene, camera, get status() { return status; }, get vacuum() { return vacuum; }, get switches() { return switches; }, get toys() { return toys; } }; // 콘솔 디버깅용
+globalThis.viewer = { leds, units, mats, scene, camera, renderer, get status() { return status; }, get vacuum() { return vacuum; }, get switches() { return switches; }, get toys() { return toys; } }; // 콘솔 디버깅용
 
 function setupScene(gltf, nightSky) {
   const root = gltf.scene;
@@ -446,6 +446,8 @@ function findOccluders(root) {
     o.traverse((m) => {
       if (!m.isMesh) return;
       m.material = m.material.clone(); // 같은 재질을 쓰는 다른 소품까지 투명해지지 않게
+      // 투명한 양면 재질을 뒷면·앞면 두 번에 나눠 그리면 three.js가 한쪽 면 셰이더를 남겨 둔다. 한 번에 그리게 한다.
+      m.material.forceSinglePass = true;
       m.userData.opacity = m.material.opacity;
       m.userData.shadow = m.castShadow;
     });
@@ -461,7 +463,10 @@ function stepFade(dt) {
   for (const o of occluders) {
     o.traverse((m) => {
       if (!m.isMesh) return;
-      m.material.transparent = fade > 0 || m.userData.opacity < 1;
+      const transparent = fade > 0 || m.userData.opacity < 1;
+      // 불투명/투명은 셰이더가 달라서(OPAQUE) 바뀔 때 다시 고르게 한다. 안 하면 돌아온 뒤에도 빛 받는 모습이 달라진다.
+      if (m.material.transparent !== transparent) m.material.needsUpdate = true;
+      m.material.transparent = transparent;
       m.material.opacity = m.userData.opacity * (1 - 0.93 * fade);
       m.material.depthWrite = fade < 0.5;
       m.castShadow = fade < 0.5 && m.userData.shadow;

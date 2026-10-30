@@ -16,9 +16,9 @@ WIN = (-1.35, -0.35, 0.80, 2.00)  # 뒤 벽 창: x0, x1, z0, z1
 
 THEMES = {
     "day": dict(bg=(0.93, 0.91, 0.87), world=(0.82, 0.80, 0.76), world_strength=0.65, sun=2.6, fill=170.0, window=140.0,
-                window_color=(1.0, 0.93, 0.80), floor_lamp=0.0, desk_lamp=0.0, sconce=0.0, table_lamp=0.0),
+                window_color=(1.0, 0.93, 0.80), floor_lamp=0.0, desk_lamp=0.0, sconce=0.0, table_lamp=0.0, akari=0.0),
     "night": dict(bg=(0.025, 0.032, 0.065), world=(0.010, 0.016, 0.040), world_strength=0.30, sun=0.0, fill=0.0, window=18.0,
-                  window_color=(0.50, 0.62, 1.0), floor_lamp=55.0, desk_lamp=14.0, sconce=22.0, table_lamp=20.0),
+                  window_color=(0.50, 0.62, 1.0), floor_lamp=55.0, desk_lamp=14.0, sconce=22.0, table_lamp=20.0, akari=16.0),
 }
 
 
@@ -71,7 +71,7 @@ def layout(m, night, col, rack_root, cable_mats):
     props.wall_screen(m, "screen_grafana", (1.17, Y1 - 0.035, 1.47), 0, col,
                       image("tex_dashboard", 640, 360, tx.dashboard()), "GRAFANA CLOUD")
     props.cabinet(m, "cabinet", (1.18, Y1 - 0.22, 0), 0, col)
-    props.speaker(m, (1.18, Y1 - 0.22, 0.52), -8, col)
+    props.speaker(m, (1.19, Y1 - 0.20, 0.52), -5, col)
     props.plant(m, "plant_cabinet", (1.46, Y1 - 0.22, 0.52), col, height=0.2, pot=3, seed=8)
     props.table_lamp(m, "table_lamp", (0.93, Y1 - 0.20, 0.52), col)  # 랙과 스피커 사이 가운데
     props.sconce(m, "sconce", (-0.13, Y1 - 0.021, 1.72), 0, col)
@@ -94,6 +94,7 @@ def layout(m, night, col, rack_root, cable_mats):
     # 가운데·앞: 러그, 안락의자, 협탁, 고양이, 화분
     props.rug(m, "rug", (0.15, -0.42, 0), col)
     props.armchair(m, "armchair", (1.25, -0.70, 0), -58, col)
+    props.akari(m, "akari", (1.60, -0.22, 0), col)  # 안락의자 등받이 뒤
     props.side_table(m, "side_table", (0.62, -1.12, 0), col)
     # 로봇 청소기는 창 아래 충전대에 붙어 있다가 웹에서 방을 돈다
     props.dock(m, "dock", (-0.62, Y1 - 0.12, 0), 0, col)
@@ -144,6 +145,7 @@ def lights(theme):
     add("window_light", "AREA", ((wx0 + wx1) / 2, Y1 + 0.05, (wz0 + wz1) / 2), (-90, 0, 0), t["window"], t["window_color"],
         shape="RECTANGLE", size=wx1 - wx0, size_y=wz1 - wz0)
     add("floor_lamp_light", "POINT", (-1.36, -1.08, 1.40), (0, 0, 0), t["floor_lamp"], warm, shadow_soft_size=0.12)
+    add("akari_light", "POINT", (1.60, -0.22, 0.60), (0, 0, 0), t["akari"], warm, shadow_soft_size=0.10)
     add("desk_lamp_light", "POINT", (-1.43, 0.58, 1.10), (0, 0, 0), t["desk_lamp"], warm, shadow_soft_size=0.05)
     add("table_lamp_light", "POINT", (0.93, Y1 - 0.20, 0.70), (0, 0, 0), t["table_lamp"], warm, shadow_soft_size=0.06)
     add("sconce_light", "POINT", (-0.13, Y1 - 0.09, 1.74), (0, 0, 0), t["sconce"], warm, shadow_soft_size=0.06)

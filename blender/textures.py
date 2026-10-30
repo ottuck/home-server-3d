@@ -119,16 +119,52 @@ def skyline(w=1200, h=1280, night=False):
             x += bw + int(rng.integers(0, 10))
         layers.append(row)
     if not night:
-        top, bottom = np.array([0.42, 0.62, 0.88]), np.array([0.92, 0.88, 0.80])
-        a[..., :3] = (bottom * (1 - t) + top * t)[:, None, :]
+        # 맑은 낮: 위는 짙은 파랑, 지평선은 옅은 하늘색, 옅은 구름 몇 점
+        top, bottom = np.array([0.22, 0.45, 0.80]), np.array([0.72, 0.82, 0.92])
+        sky = bottom * (1 - t ** 0.6) + top * t ** 0.6
+        a[..., :3] = sky[:, None, :]
+        yy, xx = np.mgrid[0:h, 0:w]
+        crng = np.random.default_rng(3)
+        for _ in range(5):
+            cx, cy = crng.uniform(0, w), crng.uniform(h * 0.62, h * 0.92)
+            for _ in range(6):  # 작은 덩어리 여럿을 겹친 뭉게구름
+                bx, by = cx + crng.uniform(-90, 90), cy + crng.uniform(-18, 18)
+                rx, ry = crng.uniform(40, 90), crng.uniform(16, 30)
+                m = 0.55 * np.exp(-(((xx - bx) / rx) ** 2 + ((yy - by) / ry) ** 2))
+                a[..., :3] += (np.array([0.98, 0.98, 0.99]) - a[..., :3]) * m[..., None]
+        haze = bottom * 0.95
+        palette = [np.array(c) for c in ((0.80, 0.76, 0.70), (0.88, 0.87, 0.84), (0.68, 0.64, 0.60), (0.76, 0.66, 0.55),
+                                         (0.60, 0.64, 0.68), (0.84, 0.80, 0.72))]
+        glass = np.array([0.34, 0.45, 0.56])
         for k, row in enumerate(layers):
-            col = np.array([0.70, 0.74, 0.80]) * (1 - k * 0.12)
+            far = k == 0
             for x, bw, bh in row:
-                a[:bh, x:x + bw, :3] = col
-                for wy in range(14, bh - 14, 24):
-                    for wx in range(x + 10, x + bw - 14, 18):
-                        if rng.random() < 0.5:
-                            a[wy:wy + 11, wx:wx + 8, :3] = col * 0.85 + np.array([0.05, 0.07, 0.10])
+                base = palette[int(rng.integers(0, len(palette)))]
+                if far:  # 먼 건물은 공기에 묻혀 하늘색으로 옅다
+                    base = base * 0.45 + haze * 0.55
+                # 해는 왼쪽 위: 앞면은 밝고 오른쪽 옆면은 그늘
+                split = x + int(bw * 0.74)
+                a[:bh, x:split, :3] = base
+                a[:bh, split:x + bw, :3] = base * 0.74
+                a[bh - 5:bh, x:x + bw, :3] = base * 0.88  # 옥상 난간
+                ribbon = rng.random() < 0.35  # 띠 창(통유리)인 건물
+                step = 22 if far else 28
+                for wy in range(18, bh - 16, step):
+                    refl = 0.85 + 0.3 * (wy / max(bh, 1))  # 위층일수록 하늘이 비쳐 밝다
+                    g = glass * refl if not far else glass * 0.5 + haze * 0.5
+                    if ribbon:
+                        a[wy:wy + (8 if far else 12), x + 6:x + bw - 6, :3] = g
+                        continue
+                    for wx in range(x + 9, x + bw - 13, 16 if far else 19):
+                        side = 0.8 if wx >= split else 1.0
+                        a[wy:wy + (8 if far else 12), wx:wx + (6 if far else 9), :3] = g * side
+        # 맨 아래 가로수: 둥근 초록 덩어리를 겹친다
+        trng = np.random.default_rng(9)
+        for _ in range(70):
+            cx, cy, r = trng.uniform(0, w), trng.uniform(0, h * 0.08), trng.uniform(26, 48)
+            m = np.clip(1 - np.hypot(xx - cx, (yy - cy) * 1.1) / r, 0, 1) ** 0.4
+            leaf = np.array([0.20, 0.36, 0.16]) * trng.uniform(0.8, 1.2) * (0.85 + 0.25 * (yy - cy) / r).clip(0.6, 1.2)[..., None]
+            a[..., :3] = a[..., :3] * (1 - m[..., None]) + leaf * m[..., None]
         return a
 
     # 밤: 지평선 쪽이 도시 불빛으로 옅게 밝은 하늘, 달 하나, 별 조금, 불 켜진 창은 드문드문

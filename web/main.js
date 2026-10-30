@@ -104,6 +104,7 @@ const lamps = [
   [B(-1.43, 0.58, 1.10), 0.7, 2.5, false],
   [B(0.93, 1.20, 0.70), 0.9, 3.0, false],
   [B(-0.13, 1.31, 1.74), 0.9, 3.0, false],
+  [B(1.60, -0.22, 0.62), 0.8, 2.6, false], // 안락의자 뒤 아카리
 ].map(([pos, power, dist, shadow]) => {
   const l = new THREE.PointLight(warm, 0, dist, 1.9); // Cycles처럼 멀어질수록 빨리 어두워지게
   l.position.copy(pos);
@@ -176,7 +177,7 @@ function setupScene(gltf, nightSky) {
     if (o.isMesh) {
       const glow = o.name.endsWith("_screen") || o.name === "skyline";
       // 조명 기구는 자기 빛을 가리지 않도록 그림자를 만들지 않는다
-      const fixture = ["prop__floor_lamp", "prop__table_lamp", "prop__sconce"].includes(o.name);
+      const fixture = ["prop__floor_lamp", "prop__table_lamp", "prop__sconce", "prop__akari"].includes(o.name);
       o.castShadow = !glow && !fixture;
       o.receiveShadow = !glow;
       for (const m of [o.material].flat()) {
@@ -562,12 +563,14 @@ const SWITCHES = [
   { node: "prop__desk", only: "bulb", label: "책상 스탠드", light: 1 },
   { node: "prop__table_lamp", label: "탁상등", light: 2 },
   { node: "prop__sconce", label: "벽등", light: 3 },
+  { node: "prop__akari", label: "아카리", light: 4 },
   { node: "prop__sign", label: "HOME LAB 간판" },
 ];
 // Blender에서 낮 테마로 내보내 빛이 꺼진 재질에 다시 줄 발광: [r, g, b, 켰을 때 세기, 껐을 때 세기]
 const GLOW = {
   lamp_shade: [1.0, 0.78, 0.50, 0.75, 0],
   rattan_shade: [1.0, 0.70, 0.40, 2.5, 0],
+  akari_paper: [1.0, 0.82, 0.60, 0.6, 0],
   bulb: [1.0, 0.80, 0.55, 2.2, 0.3],
   sign_glow: [1.0, 0.72, 0.40, 2.2, 0],
 };

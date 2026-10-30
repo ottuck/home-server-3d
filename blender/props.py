@@ -60,6 +60,10 @@ class Mats:
         self.vacuum_led = mat("vacuum_led", (0.30, 1.0, 0.55), rough=0.3, emit=(0.30, 1.0, 0.55), strength=4.0)
         self.blind = mat("blind", (0.93, 0.91, 0.86), rough=0.6)
         self.rattan = self._rattan(glow)
+        self.cream_vinyl = mat("speaker_cream", (0.78, 0.72, 0.60), rough=0.55)
+        self.speaker_grille = self._fabric("speaker_grille", (0.70, 0.64, 0.50), "weave", 28, 8)
+        self.akari = mat("akari_paper", (0.95, 0.92, 0.84), rough=0.9, emit=(1.0, 0.82, 0.60), strength=0.55 * glow)
+        self.wire = mat("black_wire", (0.03, 0.03, 0.035), rough=0.4, metal=0.6)
         self.keycap = mat("keycap_ivory", (0.86, 0.83, 0.75), rough=0.5)
         self.keycap_mod = mat("keycap_gray", (0.48, 0.47, 0.44), rough=0.5)
         self.keycap_accent = mat("keycap_accent", (0.78, 0.20, 0.12), rough=0.5)
@@ -636,6 +640,37 @@ def rug(m, name, loc, col, w=1.7, d=1.15, seed=4):
     return root
 
 
+def akari(m, name, loc, col):
+    """이사무 노구치 아카리풍 종이 조명: 가로 살이 비치는 달걀형 한지 갓, 가는 검은 철사 다리 셋과 위 손잡이.
+    안락의자 등받이 위로 보이도록 다리를 길게 했다."""
+    root = _root(name, loc, 0, col)
+    legs, z0, h, seg, rows, ribs = 0.48, 0.48, 0.34, 48, 60, 14
+    verts, faces = [], []
+    for j in range(rows + 1):
+        t = j / rows
+        # 아래 입은 넓게 열리고(반지름 0.11), 가장 넓은 곳 0.135, 위는 둥글게 좁아진다(0.025)
+        rr = (0.11 + 0.025 * math.sin(math.pi * min(t / 0.45, 1) / 2)) * (1 - t ** 3 * 0.82)
+        rr = max(rr, 0.025) * (1 + 0.018 * math.cos(2 * math.pi * ribs * t))  # 대나무 살 자국
+        for i in range(seg):
+            a = 2 * math.pi * i / seg
+            verts.append((rr * math.cos(a), rr * math.sin(a), z0 + h * t))
+    for j in range(rows):
+        for i in range(seg):
+            a, b = j * seg + i, j * seg + (i + 1) % seg
+            faces.append((a, b, b + seg, a + seg))
+    mesh(f"{name}_shade", verts, faces, (0, 0, 0), m.akari, parent=root, col=col)
+    sphere(f"{name}_bulb", 0.03, (0, 0, z0 + 0.12), m.bulb, parent=root, col=col)
+    for k in range(3):  # 갓 아래 테두리에서 바닥으로 벌어지는 다리
+        a = R(90 + k * 120)
+        top = (0.105 * math.cos(a), 0.105 * math.sin(a), z0 + 0.005)
+        foot = (0.20 * math.cos(a), 0.20 * math.sin(a), 0.0)
+        cable(f"{name}_leg_{k}", [top, foot], 0.003, m.wire, parent=root, col=col)
+        sphere(f"{name}_foot_{k}", 0.006, foot, m.wire, parent=root, col=col)
+    cable(f"{name}_handle", [(-0.02, 0, z0 + h - 0.005), (-0.02, 0, z0 + h + 0.05), (0.02, 0, z0 + h + 0.05), (0.02, 0, z0 + h - 0.005)],
+          0.0022, m.wire, parent=root, col=col)
+    return root
+
+
 def table_lamp(m, name, loc, col):
     """수납장 탁상등(이케아 뵈야 느낌): 니켈 원판 위의 달걀 모양 라탄 갓. 갓 위아래는 뚫려 있고, 켜면 엮은 틈으로 빛이 샌다."""
     root = _root(name, loc, 0, col)
@@ -745,17 +780,29 @@ def wall_screen(m, name, loc, rotz, col, img, label, w=0.96, h=0.56):
 
 
 def speaker(m, loc, rotz, col):
-    """수납장 위 북셸프 스피커(호두나무 통, 크림색 패브릭 앞판). 웹에서 누르면 음악에 맞춰 들썩이는 부분(part__)이다."""
+    """수납장 위 가로형 블루투스 스피커(마셜 액톤 느낌): 크림색 몸통, 크림·금빛 짠 그릴, 테두리 띠,
+    윗면 앞쪽 황동 조작판과 손잡이 넷. 웹에서 누르면 음악에 맞춰 들썩이는 부분(part__)이다."""
     root = empty("part__speaker", loc, col=col)
     root.rotation_euler = (0, 0, R(rotz))
-    box("speaker_cabinet", (0.15, 0.14, 0.23), (0, 0, 0.123), m.wood_dark, bevel=0.012, parent=root, col=col)
-    box("speaker_grille", (0.128, 0.006, 0.205), (0, -0.069, 0.123), m.fabric, bevel=0.004, parent=root, col=col)
-    cyl("speaker_badge", 0.006, 0.003, (0, -0.0735, 0.036), m.brass, axis="Y", segments=16, parent=root, col=col)
+    w, d, h = 0.265, 0.15, 0.15
+    box("speaker_body", (w, d, h), (0, 0, h / 2 + 0.006), m.cream_vinyl, bevel=0.018, segments=4, parent=root, col=col)
+    grille = box("speaker_grille", (w - 0.03, 0.006, h - 0.04), (0, -d / 2 - 0.001, h / 2 + 0.002), m.speaker_grille, bevel=0.003,
+                 parent=root, col=col)
+    uv_box(grille, 0.03)
+    box("speaker_piping", (w - 0.022, 0.004, h - 0.032), (0, -d / 2 + 0.001, h / 2 + 0.002), m.ivory, bevel=0.004, parent=root, col=col)
+    box("speaker_badge", (0.05, 0.003, 0.012), (0, -d / 2 - 0.0045, h * 0.72), m.brass, bevel=0.001, parent=root, col=col)
+    box("speaker_panel", (w * 0.62, 0.035, 0.004), (0, -d / 2 + 0.025, h + 0.007), m.brass, bevel=0.0015, parent=root, col=col)
+    for k in range(4):
+        x = -w * 0.25 + k * w * 0.125 + (0.02 if k == 3 else 0)
+        if k < 3:
+            cyl(f"speaker_knob_{k}", 0.009, 0.012, (x, -d / 2 + 0.025, h + 0.014), m.brass, segments=20, bevel=0.002, parent=root, col=col)
+        else:  # 전원 토글
+            cyl(f"speaker_toggle", 0.0025, 0.016, (x, -d / 2 + 0.025, h + 0.016), m.brass, segments=10, parent=root, col=col)
     for sx in (-1, 1):
         for sy in (-1, 1):
-            cyl(f"speaker_foot_{sx}_{sy}", 0.009, 0.008, (sx * 0.055, sy * 0.05, 0.004), m.light_gray, segments=16, parent=root, col=col)
+            cyl(f"speaker_foot_{sx}_{sy}", 0.008, 0.006, (sx * (w / 2 - 0.03), sy * (d / 2 - 0.03), 0.003), m.charcoal, segments=16,
+                parent=root, col=col)
     return root
-
 
 def wall_sign(m, name, loc, rotz, col, title, subtitle):
     root = _root(name, loc, rotz, col)

@@ -3,6 +3,9 @@ root 빈 객체를 돌려 배치하므로 rotz=90이면 정면이 +X를 본다.
 """
 import math
 
+import bmesh
+import bpy
+
 import numpy as np
 
 import textures as tx
@@ -56,6 +59,11 @@ class Mats:
         self.vacuum = mat("vacuum_white", (0.88, 0.88, 0.86), rough=0.35, coat=0.3)
         self.vacuum_led = mat("vacuum_led", (0.30, 1.0, 0.55), rough=0.3, emit=(0.30, 1.0, 0.55), strength=4.0)
         self.blind = mat("blind", (0.93, 0.91, 0.86), rough=0.6)
+        self.rattan = self._rattan(glow)
+        self.keycap = mat("keycap_ivory", (0.86, 0.83, 0.75), rough=0.5)
+        self.keycap_mod = mat("keycap_gray", (0.48, 0.47, 0.44), rough=0.5)
+        self.keycap_accent = mat("keycap_accent", (0.78, 0.20, 0.12), rough=0.5)
+        self.keyboard_case = mat("keyboard_case", (0.80, 0.77, 0.69), rough=0.4)
         self.shade = mat("lamp_shade", (0.92, 0.86, 0.74), rough=0.9, emit=(1.0, 0.78, 0.50), strength=1.6 * glow)
         self.bulb = mat("bulb", (1.0, 0.95, 0.85), rough=0.3, emit=(1.0, 0.80, 0.55), strength=0.5 + 25.0 * glow)
         self.sign_glow = mat("sign_glow", (0.95, 0.88, 0.72), rough=0.5, emit=(1.0, 0.72, 0.40), strength=6.0 * glow)
@@ -63,10 +71,34 @@ class Mats:
         self.screen_boost = 1.0 if night else 0.6
 
     @staticmethod
+    def _rattan(glow):
+        """엮은 라탄 갓 재질: 바탕색 그림 + 틈만 빛나는 발광 그림(낮에도 그림이 GLB에 남도록 아주 약하게 켠다)."""
+        from lib import node_mat
+        col, light = tx.rattan()
+        mt = node_mat("rattan_shade")
+        nt = mt.node_tree
+        bsdf = nt.nodes["Principled BSDF"]
+        c = nt.nodes.new("ShaderNodeTexImage")
+        c.image = image("tex_rattan", 512, 512, col)
+        e = nt.nodes.new("ShaderNodeTexImage")
+        e.image = image("tex_rattan_glow", 512, 512, light)
+        nt.links.new(c.outputs["Color"], bsdf.inputs["Base Color"])
+        nt.links.new(e.outputs["Color"], bsdf.inputs["Emission Color"])
+        bsdf.inputs["Emission Strength"].default_value = max(2.5 * glow, 0.001)
+        bsdf.inputs["Roughness"].default_value = 0.8
+        return mt
+
+    @staticmethod
     def _fabric(name, color, kind, cells, seed):
         col, nrm = tx.fabric(color, kind=kind, cells=cells, seed=seed)
         return fabric_mat(name, image(f"tex_{name}", 256, 256, col), image(f"tex_{name}_normal", 256, 256, nrm),
                           rough=0.95 if kind == "weave" else 0.8)
+
+
+def _link_to(ob, parent, col):
+    (col or bpy.context.scene.collection).objects.link(ob)
+    ob.parent = parent
+    return ob
 
 
 def _root(name, loc, rotz, col):
@@ -258,16 +290,55 @@ def monitor(m, name, loc, rotz, img, root, col, w=0.56, h=0.33):
     return r
 
 
-def keyboard(m, name, loc, root, col):
+def mouse(m, name, loc, root, col):
+    """흰 무선 마우스(로지텍 M750 느낌): 뒤가 볼록하고 앞이 좁은 몸통, 가운데 버튼 홈, 회색 휠, 바닥은 평평하다."""
     r = empty(name, loc, parent=root, col=col)
-    box(f"{name}_case", (0.36, 0.12, 0.016), (0, 0, 0.008), m.charcoal, bevel=0.005, parent=r, col=col)
-    for row in range(4):
-        for k in range(14):
-            kw = 0.020 if not (row == 0 and 4 <= k <= 9) else 0.020
-            box(f"{name}_key_{row}_{k}", (kw, 0.019, 0.008), (-0.153 + k * 0.0236, -0.04 + row * 0.026, 0.019),
-                m.ivory if (row + k) % 9 else m.fabric_sage, bevel=0.003, segments=2, parent=r, col=col)
+    me = bpy.data.meshes.new(f"{name}_shell")
+    bm = bmesh.new()
+    bmesh.ops.create_uvsphere(bm, u_segments=40, v_segments=20, radius=1.0)
+    L, W, H = 0.056, 0.032, 0.036  # 반길이, 반너비, 높이
+    for vtx in bm.verts:
+        x, y, z = vtx.co
+        width = W * (1.0 - 0.16 * max(y, 0.0)) * (1.0 + 0.04 * min(y, 0.0))  # 앞(+Y)이 좁다
+        hump = H * (1.0 - 0.28 * y) * 0.85  # 손바닥이 닿는 뒤쪽이 높다
+        vtx.co = (x * width, y * L, max(z, 0.0) * hump + 0.0015)
+    bm.to_mesh(me)
+    bm.free()
+    for poly in me.polygons:
+        poly.use_smooth = True
+    shell = bpy.data.objects.new(f"{name}_shell", me)
+    _link_to(shell, r, col)
+    shell.data.materials.append(m.white_plastic)
+    # 왼쪽·오른쪽 버튼 사이 홈(몸통 윗면을 따라가는 가는 선)과 그 사이로 살짝 나온 휠
+    def top(yn):
+        return math.sqrt(max(0.0, 1 - yn * yn)) * H * (1.0 - 0.28 * yn) * 0.85 + 0.0015
+
+    cable(f"{name}_split", [(0, yn * L, top(yn) + 0.0003) for yn in (0.30, 0.45, 0.60, 0.75)], 0.0007, m.light_gray, parent=r, col=col)
+    cyl(f"{name}_wheel", 0.0055, 0.006, (0, 0.43 * L, top(0.43) - 0.0032), m.charcoal, axis="X", segments=20, bevel=0.0015, parent=r, col=col)
     return r
 
+
+def keyboard(m, name, loc, root, col):
+    """베이지 로우프로파일 키보드(75% 배열 다섯 줄): 아이보리 글자 키, 회색 기능 키, 빨간 Esc·Enter."""
+    r = empty(name, loc, parent=root, col=col)
+    u = 0.0185
+    box(f"{name}_case", (15 * u + 0.012, 5 * u + 0.012, 0.012), (0, 0, 0.006), m.keyboard_case, bevel=0.004, segments=3, parent=r, col=col)
+    rows = [  # 뒤(+Y)에서 앞 줄 순서. (너비 u 목록, 기능 키 위치, 강조 키 위치)
+        ([1] * 13 + [2], {13}, {0}),
+        ([1.5] + [1] * 12 + [1.5], {0, 13}, set()),
+        ([1.75] + [1] * 11 + [2.25], {0}, {12}),
+        ([2.25] + [1] * 10 + [2.75], {0, 11}, set()),
+        ([1.25] * 3 + [6.25] + [1.25] * 4, {0, 1, 2, 4, 5, 6, 7}, set()),
+    ]
+    for ri, (widths, mods, accents) in enumerate(rows):
+        x = -7.5 * u
+        y = (2 - ri) * u
+        for k, w in enumerate(widths):
+            mt = m.keycap_accent if k in accents else m.keycap_mod if k in mods else m.keycap
+            box(f"{name}_key_{ri}_{k}", (w * u - 0.0025, u - 0.0025, 0.0065), (x + w * u / 2, y, 0.0145), mt, bevel=0.0018, segments=2,
+                parent=r, col=col)
+            x += w * u
+    return r
 
 def mug(m, name, loc, root, col, material=None):
     """속이 빈 머그. 굽, 둥근 아래쪽, 테두리 두께가 보이고 커피는 테두리보다 조금 아래에 있다."""
@@ -325,7 +396,7 @@ def desk(m, name, loc, rotz, col, screen):
     # 정면을 보는 와이드 모니터 한 대(34인치급, 21:9)
     monitor(m, f"{name}_mon", (0.0, 0.10, z), 0, screen, root, col, w=0.84, h=0.36)
     keyboard(m, f"{name}_kbd", (0.0, -0.16, z), root, col)
-    sphere(f"{name}_mouse", 0.03, (0.30, -0.17, z + 0.012), m.charcoal, scale=(0.75, 1.0, 0.45), parent=root, col=col)
+    mouse(m, f"{name}_mouse", (0.30, -0.17, z), root, col)
     mug(m, f"{name}_mug", (-0.42, -0.16, z), root, col)
     # 스탠드는 오른쪽 뒤에서 키보드·마우스 쪽 책상을 비춘다(갓이 모니터에 닿지 않게 조금 앞으로 둔다)
     desk_lamp(m, f"{name}_lamp", (0.60, 0.20, z), -30, root, col)
@@ -491,15 +562,40 @@ def armchair(m, name, loc, rotz, col):
     return root
 
 
+def _bent_leg(name, material, angle, parent, col, reach=0.17, inner=0.06, top=0.4725, bend=0.06, w=0.045, t=0.02):
+    """구부린 합판 다리 하나(알토 스툴): 바닥에서 곧게 올라가 좌판 아래에서 둥글게 꺾여 가운데로 들어간다.
+    납작한 직사각형 단면(폭 w, 두께 t)을 경로를 따라 쓸어 만든다. angle은 다리가 놓이는 방향."""
+    path = [(reach, 0.0, 1.0, 0.0), (reach, top - bend, 1.0, 0.0)]  # (반지름, 높이, 바깥쪽 법선 r, z)
+    for k in range(1, 9):
+        a = math.pi / 2 * k / 8
+        path.append((reach - bend + bend * math.cos(a), top - bend + bend * math.sin(a), math.cos(a), math.sin(a)))
+    path.append((inner, top, 0.0, 1.0))
+    ca, sa = math.cos(angle), math.sin(angle)
+    verts, faces = [], []
+    for r, z, nr, nz in path:
+        for dn, dw in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+            rr, zz, side = r + nr * dn * t / 2, z + nz * dn * t / 2, dw * w / 2
+            verts.append((rr * ca - side * sa, rr * sa + side * ca, zz))
+    n = len(path)
+    for i in range(n - 1):
+        for k in range(4):
+            a0, a1 = i * 4 + k, i * 4 + (k + 1) % 4
+            faces.append((a0, a1, a1 + 4, a0 + 4))
+    faces += [(3, 2, 1, 0), ((n - 1) * 4, (n - 1) * 4 + 1, (n - 1) * 4 + 2, (n - 1) * 4 + 3)]
+    ob = mesh(name, verts, faces, (0, 0, 0), material, smooth=False, parent=parent, col=col)
+    md = ob.modifiers.new("Bevel", "BEVEL")
+    md.width, md.segments, md.limit_method = 0.004, 2, "ANGLE"
+    return ob
+
+
 def side_table(m, name, loc, col):
+    """책과 컵을 올린 알토 스툴: 둥근 좌판과 구부린 합판 다리 네 개."""
     root = _root(name, loc, 0, col)
-    cyl(f"{name}_top", 0.24, 0.035, (0, 0, 0.50), m.wood, segments=40, bevel=0.01, parent=root, col=col)
-    for i in range(3):
-        a = R(90 + i * 120)
-        leg = cyl(f"{name}_leg_{i}", 0.014, 0.50, (math.cos(a) * 0.12, math.sin(a) * 0.12, 0.25), m.wood_dark, segments=12, parent=root, col=col)
-        leg.rotation_euler = (R(8) * math.sin(a), -R(8) * math.cos(a), 0)
+    cyl(f"{name}_top", 0.21, 0.035, (0, 0, 0.50), m.wood, segments=48, bevel=0.01, parent=root, col=col)
+    for i in range(4):
+        _bent_leg(f"{name}_leg_{i}", m.wood, R(45 + 90 * i), root, col)
     mug(m, f"{name}_mug", (0.10, -0.10, 0.518), root, col, material=m.pots[2])
-    books_root = empty(f"{name}_books", (-0.08, 0.05, 0.518), parent=root, col=col)
+    books_root = empty(f"{name}_books", (-0.09, 0.04, 0.518), parent=root, col=col)
     box(f"{name}_book_a", (0.20, 0.14, 0.025), (0, 0, 0.0125), m.books[3], bevel=0.003, parent=books_root, col=col)
     book(m, f"{name}_book_b", (0, 0, 0.025), (0.17, 0.125, 0.022), m.books[1], books_root, col)
     return root
@@ -541,13 +637,31 @@ def rug(m, name, loc, col, w=1.7, d=1.15, seed=4):
 
 
 def table_lamp(m, name, loc, col):
+    """수납장 탁상등(이케아 뵈야 느낌): 니켈 원판 위의 달걀 모양 라탄 갓. 갓 위아래는 뚫려 있고, 켜면 엮은 틈으로 빛이 샌다."""
     root = _root(name, loc, 0, col)
-    sphere(f"{name}_base", 0.07, (0, 0, 0.065), m.pots[0], scale=(1, 1, 0.95), segments=32, parent=root, col=col)
-    cyl(f"{name}_neck", 0.008, 0.08, (0, 0, 0.16), m.brass, segments=12, parent=root, col=col)
-    cone(f"{name}_shade", 0.11, 0.07, 0.12, (0, 0, 0.18), m.shade, segments=40, parent=root, col=col, caps=False)
-    sphere(f"{name}_bulb", 0.025, (0, 0, 0.22), m.bulb, parent=root, col=col)
+    lathe(f"{name}_base", [(0, 0), (0.055, 0), (0.055, 0.01), (0.04, 0.026), (0.012, 0.03), (0, 0.03)], (0, 0, 0), m.chrome, parent=root, col=col)
+    cyl(f"{name}_stem", 0.006, 0.07, (0, 0, 0.06), m.chrome, segments=12, parent=root, col=col)
+    sphere(f"{name}_bulb", 0.025, (0, 0, 0.16), m.bulb, parent=root, col=col)
+    # 달걀형 갓: 아래 입 반지름 0.05, 가장 넓은 곳 0.10(높이 60%), 위 입 0.035. 둘레(u)·높이(v) UV를 직접 준다.
+    z0, h, seg, rows = 0.032, 0.32, 48, 24
+    verts, faces, uvs = [], [], []
+    for j in range(rows + 1):
+        t = j / rows
+        rr = 0.035 + 0.065 * math.sin(math.pi * min(t ** 0.85 * 1.02, 1.0)) ** 0.75 + 0.015 * (1 - t)
+        for i in range(seg + 1):
+            a = 2 * math.pi * i / seg
+            verts.append((rr * math.cos(a), rr * math.sin(a), z0 + h * t))
+    for j in range(rows):
+        for i in range(seg):
+            a = j * (seg + 1) + i
+            faces.append((a, a + 1, a + seg + 2, a + seg + 1))
+    shade = mesh(f"{name}_shade", verts, faces, (0, 0, 0), m.rattan, parent=root, col=col)
+    uv = shade.data.uv_layers.new(name="UVMap")
+    for poly in shade.data.polygons:
+        for li in poly.loop_indices:
+            vi = shade.data.loops[li].vertex_index
+            uv.data[li].uv = ((vi % (seg + 1)) / seg, (vi // (seg + 1)) / rows)
     return root
-
 
 def _pleated_shade(name, r_bottom, r_top, height, z0, material, parent, col, pleats=36, segments=144):
     """주름진 원뿔대 갓(위아래가 뚫린 한 겹 면)."""
@@ -578,27 +692,31 @@ def floor_lamp(m, name, loc, col):
 
 
 def vacuum(m, loc, col):
-    """로봇 청소기. 정면(-Y)에 상태 LED가 있고, 웹에서 통째로 움직이므로 중심을 축으로 둔다(part__)."""
+    """흰 로봇 청소기(에코백스 느낌): 흰 몸통과 윗면, 옆을 두른 짙은 범퍼 띠, 흰 라이다. 정면(-Y)에 상태 LED.
+    웹에서 통째로 움직이므로 중심을 축으로 둔다(part__)."""
     root = empty("part__vacuum", loc, col=col)
     cyl("vacuum_body", 0.165, 0.062, (0, 0, 0.041), m.vacuum, segments=48, bevel=0.012, parent=root, col=col)
-    cyl("vacuum_bumper", 0.168, 0.03, (0, 0, 0.026), m.charcoal, segments=48, bevel=0.006, parent=root, col=col)
-    cyl("vacuum_lid", 0.148, 0.004, (0, 0, 0.073), m.charcoal, segments=48, parent=root, col=col)
-    cyl("vacuum_lidar", 0.042, 0.024, (0, 0.05, 0.085), m.vacuum, segments=32, bevel=0.006, parent=root, col=col)
-    cyl("vacuum_lidar_cap", 0.034, 0.004, (0, 0.05, 0.098), m.charcoal, segments=32, parent=root, col=col)
-    cyl("vacuum_button", 0.014, 0.004, (0, -0.07, 0.076), m.ivory, segments=20, parent=root, col=col)
+    cyl("vacuum_bumper", 0.168, 0.026, (0, 0, 0.028), m.charcoal, segments=48, bevel=0.005, parent=root, col=col)
+    cyl("vacuum_seam", 0.135, 0.002, (0, 0, 0.0725), m.light_gray, segments=48, parent=root, col=col)
+    cyl("vacuum_lid", 0.132, 0.003, (0, 0, 0.0735), m.vacuum, segments=48, parent=root, col=col)
+    cyl("vacuum_lidar", 0.042, 0.022, (0, 0.05, 0.084), m.vacuum, segments=32, bevel=0.006, parent=root, col=col)
+    cyl("vacuum_lidar_band", 0.0425, 0.006, (0, 0.05, 0.08), m.charcoal, segments=32, parent=root, col=col)
+    cyl("vacuum_button", 0.013, 0.004, (0, -0.07, 0.076), m.light_gray, segments=20, parent=root, col=col)
     cyl("vacuum_led", 0.007, 0.004, (0, -0.105, 0.076), m.vacuum_led, segments=16, parent=root, col=col)
     return root
 
-
 def dock(m, name, loc, rotz, col):
-    """청소기 충전대. 뒤(+Y)를 벽에 붙인다."""
+    """자동 먼지 비움 스테이션: 흰 기둥형 몸통, 연회색 뚜껑 아래 물통 두 개, 앞쪽 아래는 청소기가 들어가는 짙은 입구.
+    뒤(+Y)를 벽에 붙인다."""
     root = _root(name, loc, rotz, col)
-    box(f"{name}_body", (0.26, 0.08, 0.11), (0, 0.03, 0.055), m.vacuum, bevel=0.02, parent=root, col=col)
-    box(f"{name}_face", (0.18, 0.006, 0.045), (0, -0.011, 0.06), m.charcoal, bevel=0.002, parent=root, col=col)
-    for sx in (-1, 1):
-        box(f"{name}_pin_{sx}", (0.03, 0.02, 0.006), (sx * 0.05, -0.02, 0.003), m.brass, parent=root, col=col)
+    w, d, h = 0.34, 0.24, 0.42
+    box(f"{name}_body", (w, d, h - 0.02), (0, 0, (h - 0.02) / 2), m.vacuum, bevel=0.03, segments=4, parent=root, col=col)
+    box(f"{name}_lid", (w - 0.01, d - 0.01, 0.025), (0, 0, h - 0.012), m.light_gray, bevel=0.01, segments=3, parent=root, col=col)
+    for sx in (-1, 1):  # 깨끗한 물·더러운 물 통
+        box(f"{name}_tank_{sx}", (w / 2 - 0.03, 0.006, 0.12), (sx * w / 4, -d / 2 - 0.002, h - 0.10), m.light_gray, bevel=0.004, parent=root, col=col)
+    box(f"{name}_mouth", (0.24, 0.006, 0.10), (0, -d / 2 - 0.002, 0.06), m.charcoal, bevel=0.01, segments=3, parent=root, col=col)
+    cyl(f"{name}_logo", 0.008, 0.003, (0, -d / 2 - 0.004, 0.20), m.light_gray, axis="Y", segments=16, parent=root, col=col)
     return root
-
 
 def blinds(m, name, x0, x1, z_top, y, col, count=27, stack=0.0055):
     """창 위에 걷어 올린 블라인드. 살과 아래 막대는 웹에서 내리고 기울이는 부분(part__)이다."""

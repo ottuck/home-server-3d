@@ -243,3 +243,21 @@ def rug(w_m, d_m, ppm=400, seed=4):
     normal = np.ones((h, w, 4), dtype=np.float32)
     normal[..., :3] = nrm * 0.5 + 0.5
     return out, normal
+
+
+def rattan(n=512, around=26, up=13):
+    """대나무 살을 마름모로 엮은 갓 한 장(바탕색, 발광): 살은 밝은 대나무색, 사이 틈은 어둡다.
+    발광 그림은 반대로 틈이 밝아, 불을 켜면 엮은 틈 사이로 빛이 새어 나온다. u는 둘레, v는 높이다."""
+    v, u = np.mgrid[0:n, 0:n] / n
+    a = (u * around + v * up) % 1
+    b = (u * around - v * up) % 1
+    sa, sb = np.abs(a - 0.5) < 0.30, np.abs(b - 0.5) < 0.30
+    over = ((np.floor(u * around + v * up) + np.floor(u * around - v * up)) % 2) == 0  # 위로 지나가는 살
+    strip = sa | sb
+    shade = np.where(sa & sb, np.where(over, 1.0, 0.82), 0.92) * (0.9 + 0.1 * np.cos(np.pi * (np.where(sa, a, b) - 0.5) * 2))
+    col = np.ones((n, n, 4), dtype=np.float32)
+    bamboo, gap = np.array([0.74, 0.55, 0.32]), np.array([0.10, 0.07, 0.04])
+    col[..., :3] = _srgb(np.where(strip[..., None], bamboo * shade[..., None], gap))
+    glow = np.ones((n, n, 4), dtype=np.float32)
+    glow[..., :3] = np.where(strip[..., None], np.array([0.03, 0.02, 0.01]), np.array([1.0, 0.72, 0.40]))
+    return col, glow

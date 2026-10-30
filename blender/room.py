@@ -96,8 +96,8 @@ def layout(m, night, col, rack_root, cable_mats):
     props.armchair(m, "armchair", (1.25, -0.70, 0), -58, col)
     props.side_table(m, "side_table", (0.62, -1.12, 0), col)
     # 로봇 청소기는 창 아래 충전대에 붙어 있다가 웹에서 방을 돈다
-    props.dock(m, "dock", (-0.62, Y1 - 0.07, 0), 0, col)
-    props.vacuum(m, (-0.62, Y1 - 0.25, 0), col)
+    props.dock(m, "dock", (-0.62, Y1 - 0.12, 0), 0, col)
+    props.vacuum(m, (-0.62, Y1 - 0.405, 0), col)
     props.blinds(m, "blinds", WIN[0] - 0.03, WIN[1] + 0.03, WIN[3] + 0.035, Y1 - 0.035, col)
 
 

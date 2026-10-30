@@ -80,8 +80,8 @@ def layout(m, night, col, rack_root, cable_mats):
         dx = -0.04 + k * 0.025
         cable(f"tray_drop_{k}", [(0.30 + dx, Y1 - 0.12, 2.04), (0.30 + dx, Y1 - 0.16, 1.70), (0.30 + dx, 1.12, 1.36)],
               0.0055, cable_mats[k % len(cable_mats)], col=col)
-    # 구석에는 사무실에 흔한 벤자민 고무나무: 책상 너머로 둥근 수관이 보인다
-    props.ficus(m, "plant_corner", (-1.36, 1.06, 0), col, seed=3)
+    # 구석에는 행운목: 키 다른 줄기 세 개가 책상 너머로 잎을 펼친다
+    props.dracaena(m, "plant_corner", (-1.32, 1.04, 0), col, seed=3)
     # 왼쪽 벽: 작업 책상, 의자, 선반, 간판
     # 와이드 모니터: 좌우로 나눈 에디터 두 칸
     code = np.concatenate([tx.code(w=420, h=340, seed=3), tx.code(w=420, h=340, seed=9)], axis=1)
@@ -144,6 +144,6 @@ def lights(theme):
     add("window_light", "AREA", ((wx0 + wx1) / 2, Y1 + 0.05, (wz0 + wz1) / 2), (-90, 0, 0), t["window"], t["window_color"],
         shape="RECTANGLE", size=wx1 - wx0, size_y=wz1 - wz0)
     add("floor_lamp_light", "POINT", (-1.36, -1.08, 1.40), (0, 0, 0), t["floor_lamp"], warm, shadow_soft_size=0.12)
-    add("desk_lamp_light", "POINT", (-1.25, 0.66, 1.08), (0, 0, 0), t["desk_lamp"], warm, shadow_soft_size=0.05)
+    add("desk_lamp_light", "POINT", (-1.43, 0.58, 1.10), (0, 0, 0), t["desk_lamp"], warm, shadow_soft_size=0.05)
     add("table_lamp_light", "POINT", (0.80, Y1 - 0.20, 0.76), (0, 0, 0), t["table_lamp"], warm, shadow_soft_size=0.06)
     add("sconce_light", "POINT", (-0.13, Y1 - 0.09, 1.74), (0, 0, 0), t["sconce"], warm, shadow_soft_size=0.06)

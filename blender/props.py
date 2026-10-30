@@ -36,6 +36,12 @@ class Mats:
             (0.42, 0.52, 0.40), (0.82, 0.76, 0.62), (0.62, 0.30, 0.18), (0.12, 0.20, 0.35),
             (0.78, 0.58, 0.22), (0.25, 0.25, 0.27), (0.70, 0.66, 0.58), (0.35, 0.22, 0.15)])]
         self.stone = mat("pot_stone", (0.66, 0.60, 0.51), rough=0.75)
+        self.dracaena = mat("dracaena_leaf", (0.05, 0.17, 0.045), rough=0.5)
+        self.dracaena_stripe = mat("dracaena_stripe", (0.24, 0.40, 0.05), rough=0.5)
+        self.cane = mat("cane", (0.17, 0.13, 0.07), rough=0.85)
+        self.raffia = mat("raffia", (0.80, 0.72, 0.52), rough=0.95)
+        self.basket = self._fabric("basket_seagrass", (0.55, 0.42, 0.24), "weave", 14, 6)
+        self.basket_dark = self._fabric("basket_band", (0.30, 0.22, 0.13), "weave", 14, 7)
         self.ficus = [mat("ficus_leaf_a", (0.045, 0.15, 0.04), rough=0.45), mat("ficus_leaf_b", (0.08, 0.22, 0.06), rough=0.45),
                       mat("ficus_leaf_c", (0.13, 0.30, 0.08), rough=0.5)]
         self.bark = mat("bark", (0.26, 0.19, 0.12), rough=0.9)
@@ -67,10 +73,10 @@ def _root(name, loc, rotz, col):
 
 # ---------------------------------------------------------------- 식물
 
-def _leaf(name, length, width, elev, droop, yaw, base, material, root, col, twist=0.0, n=14):
+def _leaf(name, length, width, elev, droop, yaw, base, material, root, col, twist=0.0, n=14, stripe=None):
     """잎 한 장: 가장 넓은 곳이 아래쪽 40%쯤인 뾰족한 잎. 가운데 잎맥을 따라 살짝 V자로 접히고,
     가장자리는 아래로 말리며, 끝으로 갈수록 처지고 비틀린다."""
-    across = (-1.0, -0.5, 0.0, 0.5, 1.0)
+    across = (-1.0, -0.2, 0.0, 0.2, 1.0) if stripe else (-1.0, -0.5, 0.0, 0.5, 1.0)
     verts, faces = [], []
     for i in range(n + 1):
         t = i / n
@@ -87,7 +93,12 @@ def _leaf(name, length, width, elev, droop, yaw, base, material, root, col, twis
         for k in range(w - 1):
             a = i * w + k
             faces.append((a, a + 1, a + w + 1, a + w))
-    return mesh(name, verts, faces, base, material, rot=(0, 0, yaw), parent=root, col=col)
+    ob = mesh(name, verts, faces, base, material, rot=(0, 0, yaw), parent=root, col=col)
+    if stripe:  # 가운데 두 칸(잎맥 양옆)은 밝은 줄무늬
+        ob.data.materials.append(stripe)
+        for f, poly in enumerate(ob.data.polygons):
+            poly.material_index = 1 if f % (w - 1) in (1, 2) else 0
+    return ob
 
 
 def planter(m, name, style, pr, ph, root, col):
@@ -142,6 +153,61 @@ def plant(m, name, loc, col, height=1.0, pot=0, seed=1, rotz=0, reach=1.0):
         _leaf(f"{name}_leaf_{i}", rng.uniform(0.10, 0.17) * size, rng.uniform(0.045, 0.07) * (0.7 + 0.5 * height),
               R(rng.uniform(20, 60)), rng.uniform(1.0, 3.0) / (0.6 + height), yaw, (bx, by, stem_h),
               m.leaf[int(rng.integers(0, 3))], root, col, twist=rng.uniform(-0.5, 0.5))
+    return root
+
+
+def dracaena(m, name, loc, col, seed=1):
+    """행운목(드라세나 마상게아나): 키가 다른 마디진 줄기 세 개 끝에 길고 휘어지는 줄무늬 잎 다발.
+    해초를 엮은 배불뚝이 바구니(손잡이 둘, 아래쪽은 짙은 띠)에 담고 흙은 라피아로 덮는다.
+    웹에서 누르면 흔들리므로 바구니 바닥 중심을 축으로 하는 부분(part__)이다."""
+    rng = np.random.default_rng(seed)
+    root = _root(f"part__{name}", loc, 0, col)
+    rb, hb = 0.19, 0.34  # 바구니 최대 반지름, 높이
+
+    def wall(z):
+        return rb * (0.80 + 0.20 * math.sin(math.pi * min(z / (hb * 0.95), 1.0) * 0.92))
+
+    low = [(0, 0), (rb * 0.72, 0)] + [(wall(z), z) for z in np.linspace(0.01, hb * 0.32, 5)]
+    up = [(wall(z), z) for z in np.linspace(hb * 0.32, hb, 9)]
+    lathe(f"{name}_basket_low", low + [(wall(hb * 0.32) * 0.95, hb * 0.32), (0, hb * 0.32)], (0, 0, 0), m.basket_dark, parent=root, col=col)
+    rim = [(wall(hb) * 0.94, hb), (wall(hb) * 0.92, hb * 0.86), (0, hb * 0.86)]
+    upper = lathe(f"{name}_basket", [(0, hb * 0.32 - 0.001)] + up + rim, (0, 0, 0), m.basket, parent=root, col=col)
+    uv_box(upper, 0.05)
+    for ob in root.children:
+        if ob.name.endswith("_basket_low"):
+            uv_box(ob, 0.05)
+    cable(f"{name}_basket_lip", [(wall(hb) * math.cos(a), wall(hb) * math.sin(a), hb) for a in np.linspace(0, 2 * math.pi, 24, endpoint=False)],
+          0.008, m.basket, parent=root, col=col, cyclic=True)
+    for sx in (-1, 1):  # 손잡이: 테두리 양옆에서 솟은 꼰 고리
+        x = sx * wall(hb) * 0.98
+        cable(f"{name}_handle_{sx}", [(x, -0.07, hb - 0.005), (x + sx * 0.02, -0.05, hb + 0.06), (x + sx * 0.02, 0.05, hb + 0.06), (x, 0.07, hb - 0.005)],
+              0.006, m.basket, parent=root, col=col)
+    soil = hb * 0.86
+    cyl(f"{name}_soil", wall(hb) * 0.9, 0.01, (0, 0, soil + 0.005), m.soil, segments=32, parent=root, col=col)
+    for i in range(26):  # 흙을 덮은 라피아 뭉치
+        a0, rr = rng.uniform(0, 2 * math.pi), rng.uniform(0.02, 0.13)
+        pts = [(rr * math.cos(a0 + k * 0.5) + rng.uniform(-0.02, 0.02), rr * math.sin(a0 + k * 0.5) + rng.uniform(-0.02, 0.02),
+                soil + 0.012 + rng.uniform(0, 0.03)) for k in range(4)]
+        cable(f"{name}_raffia_{i}", pts, 0.0022, m.raffia, parent=root, col=col)
+    # 줄기 세 개: (밑동 위치, 높이, 기울기 방향). 방 안쪽(+X)과 창 쪽(+Y)으로 벌어진다.
+    canes = [((0.02, 0.03), 1.25, (0.05, 0.06)), ((0.05, -0.04), 0.95, (0.12, -0.02)), ((-0.04, -0.01), 0.70, (0.06, -0.08))]
+    for c, ((bx, by), tall, (lx, ly)) in enumerate(canes):
+        tip = (bx + lx, by + ly, soil + tall)
+        cable(f"{name}_cane_{c}", [(bx, by, soil), (bx + lx * 0.35, by + ly * 0.35, soil + tall * 0.5), tip], 0.019, m.cane, parent=root, col=col)
+        for k in range(int(tall / 0.035)):  # 마디
+            t = (k + 0.5) * 0.035 / tall
+            ring = cyl(f"{name}_ring_{c}_{k}", 0.021, 0.004, (bx + lx * t * t, by + ly * t * t, soil + tall * t), m.cane, segments=12,
+                       parent=root, col=col)
+            ring.rotation_euler = (math.atan2(-ly, 1.0) * 0.5, math.atan2(lx, 1.0) * 0.5, 0)
+        # 줄기 끝 잎 다발: 어린 잎은 위로 서고, 오래된 잎은 바깥으로 휘어 처진다
+        count = 16 if tall > 1.0 else 13
+        for i in range(count):
+            age = i / (count - 1)
+            yaw = i * 2.4 + rng.uniform(-0.3, 0.3)
+            length = rng.uniform(0.26, 0.38) * (0.8 + 0.3 * age)
+            _leaf(f"{name}_leaf_{c}_{i}", length, rng.uniform(0.065, 0.085), R(62 - 70 * age + rng.uniform(-8, 8)),
+                  rng.uniform(0.8, 1.6) * (0.4 + 0.9 * age), yaw, (tip[0], tip[1], tip[2] - 0.05 * age),
+                  m.dracaena, root, col, twist=rng.uniform(-0.4, 0.4), n=10, stripe=m.dracaena_stripe)
     return root
 
 
@@ -253,9 +319,38 @@ def desk(m, name, loc, rotz, col, screen):
     keyboard(m, f"{name}_kbd", (0.0, -0.16, z), root, col)
     sphere(f"{name}_mouse", 0.03, (0.30, -0.17, z + 0.012), m.charcoal, scale=(0.75, 1.0, 0.45), parent=root, col=col)
     mug(m, f"{name}_mug", (-0.42, -0.16, z), root, col)
-    desk_lamp(m, f"{name}_lamp", (0.58, 0.16, z), 20, root, col)
+    # 스탠드는 오른쪽 뒤에서 키보드·마우스 쪽 책상을 비춘다(갓이 모니터에 닿지 않게 조금 앞으로 둔다)
+    desk_lamp(m, f"{name}_lamp", (0.60, 0.20, z), -30, root, col)
     plant(m, f"{name}_plant", (-0.58, 0.18, z), col, height=0.15, pot=1, seed=5).parent = root
     return root
+
+
+def _chair_back(m, name, parent, col, z0=0.52, height=0.54, y0=0.272):
+    """메시 등판: 허리는 좁고 어깨는 넓으며 위는 둥근 돔이다. 가로로 몸을 감싸게 휘고, 허리께가 앞으로 살짝 나오며,
+    뒤로 10° 눕는다. 메시 판은 두께를 주고, 가장자리는 검은 틀(닫힌 관)이 두른다."""
+    nu, nv = 14, 24
+
+    def half_width(v):
+        if v <= 0.78:  # 허리(0.19) → 어깨(0.235)
+            return 0.19 + 0.045 * (0.5 - 0.5 * math.cos(math.pi * max(0.0, v - 0.3) / 0.48)) if v > 0.3 else 0.19
+        t = min((v - 0.78) / 0.22, 0.985)
+        return 0.235 * (1 - t ** 4) ** 0.25  # 둥근 모서리의 돔
+
+    def point(u, v):
+        x = u * half_width(v)
+        y = y0 + v * height * math.tan(R(10)) - 0.04 * u * u - 0.022 * math.exp(-((v - 0.32) / 0.14) ** 2)
+        return (x, y, z0 + v * height)
+
+    verts = [point(-1 + 2 * i / nu, j / nv) for j in range(nv + 1) for i in range(nu + 1)]
+    faces = [(j * (nu + 1) + i, j * (nu + 1) + i + 1, (j + 1) * (nu + 1) + i + 1, (j + 1) * (nu + 1) + i) for j in range(nv) for i in range(nu)]
+    panel = mesh(f"{name}_back", verts, faces, (0, 0, 0), m.chair_mesh, parent=parent, col=col)
+    uv_box(panel, 0.06)
+    md = panel.modifiers.new("Solidify", "SOLIDIFY")
+    md.thickness = 0.012
+    md.offset = 0
+    rim = [point(1, j / nv) for j in range(0, nv + 1, 2)] + [point(-1, j / nv) for j in range(nv, -1, -2)]
+    cable(f"{name}_back_rim", rim, 0.011, m.black_metal, parent=parent, col=col, cyclic=True)
+    return panel
 
 
 def chair(m, name, loc, rotz, col):
@@ -273,12 +368,9 @@ def chair(m, name, loc, rotz, col):
     top = empty(f"part__{name}_top", (0, 0, 0), parent=root, col=col)
     box(f"{name}_mech", (0.20, 0.22, 0.04), (0, 0.02, 0.37), m.black_metal, bevel=0.01, parent=top, col=col)
     uv_box(box(f"{name}_seat", (0.50, 0.48, 0.08), (0, 0, 0.43), m.chair_mesh, bevel=0.04, segments=5, parent=top, col=col), 0.06)
-    # 등받이: 좌판 뒤 아래에서 올라오는 받침대에 검은 틀과 메시 판을 단다
-    cable(f"{name}_spine", [(0, 0.10, 0.38), (0, 0.27, 0.40), (0, 0.29, 0.58)], 0.018, m.black_metal, parent=top, col=col)
-    frame = box(f"{name}_back_frame", (0.48, 0.03, 0.54), (0, 0.295, 0.82), m.black_metal, bevel=0.08, segments=6, parent=top, col=col)
-    frame.rotation_euler = (R(-8), 0, 0)
-    mesh_back = uv_box(box(f"{name}_back", (0.44, 0.025, 0.50), (0, 0.272, 0.82), m.chair_mesh, bevel=0.07, segments=6, parent=top, col=col), 0.06)
-    mesh_back.rotation_euler = (R(-8), 0, 0)
+    # 등받이: 좌판 뒤 아래에서 올라오는 받침대가 등판 허리께를 붙잡는다
+    cable(f"{name}_spine", [(0, 0.10, 0.38), (0, 0.27, 0.41), (0, 0.29, 0.60)], 0.018, m.black_metal, parent=top, col=col)
+    _chair_back(m, name, top, col)
     for sx in (-1, 1):
         cable(f"{name}_arm_{sx}", [(sx * 0.10, 0.03, 0.385), (sx * 0.27, 0.03, 0.40), (sx * 0.285, 0.03, 0.61)], 0.012, m.black_metal, parent=top, col=col)
         box(f"{name}_arm_pad_{sx}", (0.07, 0.24, 0.028), (sx * 0.285, 0.01, 0.628), m.charcoal, bevel=0.012, segments=3, parent=top, col=col)
@@ -372,27 +464,22 @@ def cabinet(m, name, loc, rotz, col, w=0.9, d=0.40, h=0.52):
 
 
 def armchair(m, name, loc, rotz, col):
-    """굵은 평직 천을 씌운 안락의자: 둥글게 만 팔걸이, 따로 얹은 좌석·등 쿠션, 황동 발끝."""
+    """굵은 평직 천을 씌운 안락의자. 모양은 단순한 상자형 그대로 두고 질감만 입힌다."""
     root = _root(name, loc, rotz, col)
     f = m.armchair_fabric
 
-    def soft(part, size, at, bevel, rot=None):
-        ob = box(f"{name}_{part}", size, at, f, bevel=bevel, segments=5, parent=root, col=col, rot=rot)
-        return uv_box(ob, 0.05)
+    def soft(part, size, at, bevel, rot=None, material=f, parent=root):
+        return uv_box(box(f"{name}_{part}", size, at, material, bevel=bevel, parent=parent, col=col, rot=rot), 0.05)
 
     soft("base", (0.86, 0.80, 0.22), (0, 0, 0.21), 0.05)
-    soft("cushion", (0.60, 0.64, 0.14), (0, -0.05, 0.385), 0.06)
-    soft("back", (0.86, 0.18, 0.52), (0, 0.32, 0.52), 0.07, rot=(R(-6), 0, 0))
-    soft("back_cushion", (0.58, 0.12, 0.34), (0, 0.205, 0.62), 0.055, rot=(R(-10), 0, 0))
+    soft("cushion", (0.62, 0.66, 0.13), (0, -0.04, 0.38), 0.055)
+    soft("back", (0.86, 0.20, 0.50), (0, 0.31, 0.50), 0.07, rot=(R(-6), 0, 0))
     for sx in (-1, 1):
-        soft(f"arm_{sx}", (0.14, 0.78, 0.30), (sx * 0.37, 0.0, 0.36), 0.05)
-        uv_box(cyl(f"{name}_arm_roll_{sx}", 0.075, 0.80, (sx * 0.37, -0.005, 0.50), f, axis="Y", segments=32, bevel=0.02, parent=root, col=col), 0.05)
+        soft(f"arm_{sx}", (0.14, 0.78, 0.36), (sx * 0.37, 0.0, 0.40), 0.06)
         for sy in (-1, 1):
             cone(f"{name}_leg_{sx}_{sy}", 0.016, 0.022, 0.10, (sx * 0.34, sy * 0.30, 0), m.wood_dark, segments=12, parent=root, col=col)
-            cyl(f"{name}_toe_{sx}_{sy}", 0.0165, 0.012, (sx * 0.34, sy * 0.30, 0.006), m.brass, segments=12, parent=root, col=col)
-    pillow = empty(f"part__{name}_pillow", (0.10, 0.07, 0.61), parent=root, col=col)
-    uv_box(box(f"{name}_pillow_body", (0.36, 0.12, 0.30), (0, 0, 0), m.pillow_fabric, bevel=0.06, segments=5, parent=pillow, col=col,
-               rot=(R(-15), 0, R(8))), 0.05)
+    pillow = empty(f"part__{name}_pillow", (0.08, 0.17, 0.58), parent=root, col=col)
+    soft("pillow_body", (0.36, 0.12, 0.30), (0, 0, 0), 0.06, rot=(R(-15), 0, R(8)), material=m.pillow_fabric, parent=pillow)
     return root
 
 
@@ -421,10 +508,27 @@ def book(m, name, loc, size, material, root, col):
     box(f"{name}_cover_slab", (w, d, 0.003), (-w / 2, 0, -0.0015), material, bevel=0.001, parent=hinge, col=col)
 
 
-def rug(m, name, loc, col, w=1.7, d=1.15):
+def rug(m, name, loc, col, w=1.7, d=1.15, seed=4):
+    """짠 러그: 윗면 그림 한 장(크림 바탕, 마름모 격자, 갈색 테두리와 선 두 줄, 고리 파일 질감)과 짧은 쪽 끝의 술."""
+    rng = np.random.default_rng(seed)
     root = _root(name, loc, 0, col)
-    box(f"{name}_border", (w, d, 0.012), (0, 0, 0.006), m.rug_border, bevel=0.006, parent=root, col=col)
-    box(f"{name}_field", (w - 0.12, d - 0.12, 0.014), (0, 0, 0.007), m.rug, bevel=0.006, parent=root, col=col)
+    color, normal = tx.rug(w, d, seed=seed)
+    h, wp = color.shape[:2]
+    material = fabric_mat("rug_woven", image("tex_rug", wp, h, color), image("tex_rug_normal", wp, h, normal), rough=1.0, strength=0.6)
+    body = box(f"{name}_body", (w, d, 0.014), (0, 0, 0.007), material, bevel=0.004, segments=2, parent=root, col=col)
+    me = body.data
+    uv = me.uv_layers.new(name="UVMap")
+    for poly in me.polygons:
+        for li in poly.loop_indices:
+            co = me.vertices[me.loops[li].vertex_index].co
+            uv.data[li].uv = ((co.x + w / 2) / w, (co.y + d / 2) / d)
+    for sx in (-1, 1):  # 술: 짧은 쪽 끝에 1.5cm 간격
+        for k in range(int(d / 0.015)):
+            y = -d / 2 + 0.01 + k * 0.015
+            length = rng.uniform(0.04, 0.055)
+            tassel = box(f"{name}_fringe_{sx}_{k}", (length, 0.004, 0.002), (sx * (w / 2 + length / 2 - 0.004), y, 0.001), m.raffia,
+                         parent=root, col=col)
+            tassel.rotation_euler = (0, 0, rng.uniform(-0.12, 0.12))
     return root
 
 

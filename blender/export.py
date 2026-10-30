@@ -138,5 +138,8 @@ def export(path, collections):
         export_cameras=False,
         export_draco_mesh_compression_enable=True,
         export_draco_mesh_compression_level=6,
+        # 직물·러그 그림은 잡음이 많아 PNG로는 무겁다. 모든 그림을 JPEG로 내보낸다.
+        export_image_format="JPEG",
+        export_jpeg_quality=85,
     )
     return os.path.getsize(path)

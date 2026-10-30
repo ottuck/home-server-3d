@@ -100,7 +100,7 @@ windowLight.target.position.copy(B(-0.4, -0.3, 0.2));
 const warm = 0xffb873;
 const lamps = [
   [B(-1.36, -1.08, 1.42), 3.6, 6.5, true], // 스탠드: 방 전체를 밝히는 주 조명
-  [B(-1.25, 0.66, 1.08), 0.7, 2.5, false],
+  [B(-1.43, 0.58, 1.10), 0.7, 2.5, false],
   [B(0.80, 1.20, 0.76), 0.9, 3.0, false],
   [B(-0.13, 1.31, 1.74), 0.9, 3.0, false],
 ].map(([pos, power, dist, shadow]) => {

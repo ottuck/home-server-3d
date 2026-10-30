@@ -272,7 +272,7 @@ def screen_mat(name, img, strength=1.0):
     return m
 
 
-def cable(name, points, radius, material, parent=None, col=None):
+def cable(name, points, radius, material, parent=None, col=None, cyclic=False):
     cu = bpy.data.curves.new(name, "CURVE")
     cu.dimensions = "3D"
     cu.bevel_depth = radius
@@ -280,6 +280,7 @@ def cable(name, points, radius, material, parent=None, col=None):
     cu.resolution_u = 14
     cu.use_fill_caps = True
     sp = cu.splines.new("BEZIER")
+    sp.use_cyclic_u = cyclic
     sp.bezier_points.add(len(points) - 1)
     for bp, p in zip(sp.bezier_points, points):
         bp.co = p

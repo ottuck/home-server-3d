@@ -209,3 +209,37 @@ def fabric(color, kind="weave", n=256, cells=8, strength=4.0, seed=1):
     lo = 0.72 if kind == "weave" else 0.45  # 메시는 구멍이 더 어둡게 보인다
     col[..., :3] = _srgb(np.array(color)[None, None, :] * (lo + (1.12 - lo) * np.clip(h, 0, 1))[..., None])
     return col, normal
+
+
+def rug(w_m, d_m, ppm=400, seed=4):
+    """러그 윗면 한 장(바탕색, 노멀 맵): 크림색 바탕에 은은한 마름모 격자, 가장자리에 갈색 띠와 가는 선 두 줄,
+    고리 파일 질감. 그림 한 장이 러그 전체를 덮는다(0번 줄이 앞쪽)."""
+    w, h = int(w_m * ppm), int(d_m * ppm)
+    rng = np.random.default_rng(seed)
+    y, x = np.mgrid[0:h, 0:w] / ppm  # 미터
+    edge = np.minimum(np.minimum(x, w_m - x), np.minimum(y, d_m - y))
+    field, band, line = np.array([0.80, 0.74, 0.62]), np.array([0.40, 0.30, 0.21]), np.array([0.52, 0.40, 0.28])
+    col = np.broadcast_to(field, (h, w, 3)).copy()
+    # 바탕의 마름모 격자(아주 옅게)
+    cx, cy = x - w_m / 2, y - d_m / 2
+    lattice = np.abs(((cx + cy) / 0.16) % 1 - 0.5) + np.abs(((cx - cy) / 0.16) % 1 - 0.5)
+    col = np.where((lattice < 0.10)[..., None], col * 0.9 + line * 0.1 * 0.9, col)
+    # 테두리: 바깥 갈색 띠, 그 안쪽에 가는 선 두 줄
+    col[edge < 0.06] = band
+    for d0 in (0.085, 0.105):
+        col[(edge > d0) & (edge < d0 + 0.008)] = line
+    # 고리 파일: 실 한 가닥 크기의 잡음과 가로 줄(직조 방향)
+    r = rng.random((h, w))
+    r = (r + np.roll(r, 1, 0) + np.roll(r, 1, 1)) / 3
+    rows = 0.5 + 0.5 * np.sin(y * ppm * np.pi / 2.2)
+    pile = 0.55 * r + 0.45 * rows
+    col *= (0.88 + 0.2 * pile)[..., None]
+    out = np.ones((h, w, 4), dtype=np.float32)
+    out[..., :3] = _srgb(col)
+    gx = (np.roll(pile, -1, 1) - np.roll(pile, 1, 1)) * 1.5
+    gy = (np.roll(pile, -1, 0) - np.roll(pile, 1, 0)) * 1.5
+    nrm = np.stack([-gx, -gy, np.ones_like(pile)], -1)
+    nrm /= np.linalg.norm(nrm, axis=-1, keepdims=True)
+    normal = np.ones((h, w, 4), dtype=np.float32)
+    normal[..., :3] = nrm * 0.5 + 0.5
+    return out, normal

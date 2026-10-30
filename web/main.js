@@ -595,14 +595,15 @@ function stepVacuum(t) {
 }
 
 // 눌러서 움직이는 소품: 책 덮개, 안락의자 쿠션, 의자 윗부분, 블라인드.
-// value가 target을 따라가며(빠르게 시작해 천천히 멈춘다) apply가 그 값으로 모양을 바꾼다.
-const toys = []; // { label, pick: Object3D[], tip(toy), click(toy), apply(value), rate, target, value }
+// 보통은 value가 target을 따라가며(빠르게 시작해 천천히 멈춘다), spring이 있으면 0으로 돌아오는 감쇠 진동을 한다.
+// apply가 그 값으로 모양을 바꾼다.
+const toys = []; // { label, pick: Object3D[], click(toy), apply(value), rate | spring: [강성, 감쇠], target, value, vel }
 let blinds = null;
 const WIN_BOTTOM = 0.80; // 창 아래 끝 높이(blender/room.py WIN)
 
 function setupToys(root) {
   const get = (n) => root.getObjectByName(n);
-  const add = (toy) => (toys.push({ target: 0, value: 0, ...toy }), toys.at(-1));
+  const add = (toy) => (toys.push({ target: 0, value: 0, vel: 0, ...toy }), toys.at(-1));
   const flip = (toy) => (toy.target = 1 - toy.target);
 
   const cover = get("part__side_table_book_b_cover");
@@ -610,27 +611,26 @@ function setupToys(root) {
     const hit = hitBox(new THREE.Box3().setFromObject(cover).expandByVector(new THREE.Vector3(0, 0.03, 0)), 0.05);
     scene.add(hit);
     // 덮개는 등(+X 모서리)을 축으로 넘어가 책 오른쪽에 눕는다
-    add({ label: "책", pick: [hit], rate: 5, click: flip, tip: (t) => (t.target ? "눌러서 덮기" : "눌러서 펼치기"),
+    add({ label: "책", pick: [hit], rate: 5, click: flip,
       apply: (k) => (cover.rotation.z = -k * THREE.MathUtils.degToRad(172)) });
   }
 
   const pillow = get("part__armchair_pillow"), armchair = get("prop__armchair");
   if (pillow && armchair) {
-    // 쿠션을 의자 반대쪽 구석으로 던져 옮긴다(의자 기준 x로 -0.18m, 기울기는 좌우 대칭)
-    const a = pillow.position.clone();
-    const b = a.clone().addScaledVector(new THREE.Vector3(1, 0, 0).applyQuaternion(armchair.quaternion), -0.18);
-    const yaw = THREE.MathUtils.degToRad(-16);
-    add({ label: "안락의자", pick: [armchair, pillow], rate: 6, click: flip, tip: () => "눌러서 쿠션 옮기기",
-      apply: (k) => {
-        pillow.position.lerpVectors(a, b, k);
-        pillow.position.y += 0.12 * Math.sin(Math.PI * k);
-        pillow.rotation.set(0, yaw * k + 0.6 * Math.sin(Math.PI * k), 0);
+    // 쿠션을 툭 누르면 납작해졌다가 몇 번 출렁이며 제 모양으로 돌아온다. 아래쪽이 좌판에 붙어 있도록 높이도 같이 낮춘다.
+    const rest = pillow.position.y;
+    const h = new THREE.Box3().setFromObject(pillow).getSize(new THREE.Vector3()).y;
+    add({ label: "안락의자", pick: [armchair, pillow], spring: [140, 10], click: (t) => (t.vel -= 2.2),
+      apply: (v) => {
+        const k = Math.max(v, -0.35);
+        pillow.scale.set(1 - 0.5 * k, 1 + k, 1 - 0.5 * k);
+        pillow.position.y = rest + (h / 2) * k;
       } });
   }
 
   const top = get("part__chair_top");
   if (top) {
-    add({ label: "의자", pick: [get("prop__chair"), top].filter(Boolean), rate: 2.2, tip: () => "눌러서 돌리기",
+    add({ label: "의자", pick: [get("prop__chair"), top].filter(Boolean), rate: 2.2,
       click: (t) => (t.target += 2 * Math.PI), apply: (k) => (top.rotation.y = k) });
   }
 
@@ -645,7 +645,7 @@ function setupToys(root) {
     const down = up.map((y, i) => up[0] - i * gap);
     const hit = hitBox(new THREE.Box3().setFromPoints([B(-1.38, 1.33, WIN_BOTTOM), B(-0.32, 1.40, 2.08)]), 0);
     scene.add(hit);
-    blinds = add({ label: "블라인드", pick: [hit], rate: 3, click: flip, tip: (t) => (t.target ? "눌러서 올리기" : "눌러서 내리기"),
+    blinds = add({ label: "블라인드", pick: [hit], rate: 3, click: flip,
       apply: (k) => parts.forEach((o, i) => {
         o.position.y = up[i] + (down[i] - up[i]) * k;
         if (o !== bar) o.rotation.x = k * 1.05;
@@ -654,8 +654,17 @@ function setupToys(root) {
 }
 
 function stepToys(dt) {
+  dt = Math.min(dt, 0.1); // 탭을 오래 비웠다 돌아와도 튀지 않게
   for (const toy of toys) {
-    toy.value += (toy.target - toy.value) * Math.min(1, dt * toy.rate);
+    if (toy.spring) {
+      const [stiff, damp] = toy.spring;
+      for (let i = 0, n = Math.ceil(dt / 0.005); i < n; i++) {
+        toy.vel += (-stiff * toy.value - damp * toy.vel) * (dt / n);
+        toy.value += toy.vel * (dt / n);
+      }
+    } else {
+      toy.value += (toy.target - toy.value) * Math.min(1, dt * toy.rate);
+    }
     toy.apply(toy.value);
   }
   // 블라인드를 내리면 창으로 드는 빛이 줄어든다
@@ -735,11 +744,8 @@ renderer.domElement.addEventListener("pointermove", (e) => {
   if (!infra || !rack || e.buttons) return (tip.style.display = "none");
   const hit = pick(e, pickables());
   renderer.domElement.style.cursor = hit ? "pointer" : "";
-  const sw = switchOf(hit);
-  if (sw) return showTip(e, `<b>${sw.label}</b><div class="row muted">눌러서 ${sw.on ? "끄기" : "켜기"}</div>`);
-  const toy = toyOf(hit);
-  if (toy) return showTip(e, `<b>${toy.label}</b><div class="row muted">${toy.tip(toy)}</div>`);
-  if (hit && isVacuum(hit.object)) return showTip(e, `<b>로봇 청소기</b><div class="row muted">${vacuumBusy() ? "청소 중 · 눌러서 충전대로" : "눌러서 청소 시작"}</div>`);
+  // 소품은 이름표 없이 눌렀을 때 움직이는 것으로 충분하다(손가락 커서만 바꾼다)
+  if (switchOf(hit) || toyOf(hit) || (hit && isVacuum(hit.object))) return (tip.style.display = "none");
   if (onMonitor(hit)) return showTip(e, "<b>Grafana Cloud</b><div class=\"row muted\">최근 1시간 서버 지표 · 눌러서 크게 보기</div>");
   const unit = hit && unitOf(hit.object);
   if (!unit || unit.info.decor || !unit.info.containers?.length) return (tip.style.display = "none");

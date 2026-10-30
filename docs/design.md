@@ -77,6 +77,7 @@ blender -b --factory-startup --python blender/build_rack.py -- --theme day|night
 
 - 카메라는 Blender와 같은 정사영 구도(tilt 58°, yaw 40°)다. 회전은 좌우 ±25°, 상하 -14~+10°, 확대는 0.9~4배로 제한하고, 팬은 방 바닥 안으로 묶는다.
 - Blender 조명은 GLB에 들어가지 않아서 뷰어가 같은 자리에 다시 둔다. 밤 분위기의 기준은 Cycles 밤 렌더(`docs/renders/room_night.png`)다.
+- 실시간 렌더는 튕긴 빛(간접광)을 계산하지 않아 구석이 밝게 뜬다. 앰비언트 오클루전(`GTAOPass`, 반경 0.5m)으로 가구가 맞닿은 구석과 밑을 어둡게 하고, 밤에는 주변광을 낮추고 조명 감쇠를 1.9로 높여 Cycles처럼 조명 주변만 밝게 한다. 휴대폰에서는 AO 표본을 절반으로 줄인다.
 - glTF로 옮기면 clearcoat가 거울처럼 매끈해져서 거칠기를 올린다(바닥 0.22, 나머지 0.4).
 - 벽에 붙이는 소품은 벽면과 같은 평면에 두지 않는다. 웹에서는 벽에 가려진다.
 - 링크 미리보기(Open Graph)는 밤 렌더를 1200×630으로 줄인 `web/og.png`를 쓴다(`blender/og_image.py`). 렌더를 다시 만들면 이것도 다시 만든다. 파비콘은 랙 한 대를 그린 `web/favicon.svg`이고, PNG(32px, 180px)는 그 SVG를 resvg로 굽는다.
@@ -127,4 +128,4 @@ Cloudflare Pages 하나로 정적 웹과 `GET /api/status`를 함께 낸다. Lig
 
 ## 남은 일
 
-- 웹 조명이 Cycles와 차이가 크면 SSAO나 조명 굽기(낮/밤 두 벌)를 검토한다.
+- 조명 굽기(Cycles 간접광을 텍스처로, 조명마다 따로 구워 섞기)는 상호작용과 파일 크기 때문에 보류했다.

@@ -6,6 +6,7 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { STATUS_COLOR, fetchStatus, fetchHistory, fetchGithub, containerStatus, unitStatus } from "./status.js";
@@ -40,7 +41,7 @@ const THEMES = {
     screen: 0.7, led: 7, bloom: [0.25, 0.3, 2.2],
   },
   night: {
-    bg: 0x1a2340, hemi: 0.10, sun: 0, env: 0.05, window: 0.6, lamps: true, rack: 1.2,
+    bg: 0x1a2340, hemi: 0.07, sun: 0, env: 0.04, window: 0.6, lamps: true, rack: 1.2,
     screen: 1.0, led: 14, bloom: [0.28, 0.25, 1.5], // 밤 블룸은 빛나는 것만 살짝 번지게(벽이 뿌옇게 번지지 않게)
   },
 };
@@ -104,7 +105,7 @@ const lamps = [
   [B(0.93, 1.20, 0.70), 0.9, 3.0, false],
   [B(-0.13, 1.31, 1.74), 0.9, 3.0, false],
 ].map(([pos, power, dist, shadow]) => {
-  const l = new THREE.PointLight(warm, 0, dist, 1.6);
+  const l = new THREE.PointLight(warm, 0, dist, 1.9); // Cycles처럼 멀어질수록 빨리 어두워지게
   l.position.copy(pos);
   l.userData.power = power;
   if (shadow) {
@@ -125,6 +126,13 @@ scene.add(hemi, sun, sun.target, windowLight, windowLight.target, rackLight, rac
 
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
+// 앰비언트 오클루전: 실시간 렌더는 벽·바닥에서 튕긴 빛(간접광)을 계산하지 않아 구석이 밝게 뜬다.
+// 가구가 맞닿은 구석과 밑을 어둡게 해 Cycles 렌더의 깊이감을 흉내 낸다(반경은 미터 단위).
+const ao = new GTAOPass(scene, camera, 1, 1);
+const aoSamples = matchMedia("(pointer: coarse)").matches ? 8 : 16; // 휴대폰에서는 표본을 줄여 부드럽게
+ao.updateGtaoMaterial({ radius: 0.5, distanceExponent: 1.5, thickness: 1, scale: 1.3, samples: aoSamples });
+ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 8, rings: 2, samples: aoSamples });
+composer.addPass(ao);
 const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.4, 0.4, 0.9);
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
@@ -660,6 +668,7 @@ function rattanPattern(lamp, o, ex, ey, n, w, h) {
   const pts = [corner(0, 0), corner(1, 0), corner(1, 1), corner(0, 1)];
   mesh.geometry.setFromPoints([pts[0], pts[1], pts[2], pts[0], pts[2], pts[3]]);
   mesh.geometry.setAttribute("uv", new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1], 2));
+  mesh.geometry.computeVertexNormals(); // 앰비언트 오클루전 패스가 법선을 읽는다
   mesh.renderOrder = 1;
   scene.add(mesh);
   return mesh;
